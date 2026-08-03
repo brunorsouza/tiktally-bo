@@ -10,11 +10,49 @@ import {
   BarChart3,
   Ticket,
   Gift,
+  DollarSign,
+  Users,
+  Building2,
+  Coins,
+  Wallet,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useMe } from "@/hooks/useBoCoupons";
 import { cn } from "@/lib/utils";
 
-const sections = [
+interface NavItem {
+  to: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  end?: boolean;
+}
+interface NavSection {
+  title: string;
+  items: NavItem[];
+}
+
+/** Nav de quem NÃO é admin (business / afiliado): só o próprio escopo. */
+/** Business: gere a própria carteira (afiliados + cupons). */
+const businessSections: NavSection[] = [
+  {
+    title: "Minha carteira",
+    items: [
+      { to: "/business", label: "Visão geral", icon: Wallet },
+      { to: "/affiliates", label: "Afiliados", icon: Users },
+      { to: "/coupons", label: "Cupons", icon: Ticket },
+    ],
+  },
+];
+
+/** Afiliado: só o próprio desempenho (read-only). */
+const affiliateSections: NavSection[] = [
+  {
+    title: "Meu programa",
+    items: [{ to: "/affiliate", label: "Meu desempenho", icon: Wallet }],
+  },
+];
+
+const adminSections: NavSection[] = [
   {
     title: "Fiscal",
     items: [
@@ -30,13 +68,25 @@ const sections = [
       { to: "/coupons-overview", label: "Visão geral", icon: BarChart3 },
       { to: "/coupons", label: "Cupons", icon: Ticket },
       { to: "/redemptions", label: "Resgates", icon: Gift },
+      { to: "/pricing", label: "Planos & Preços", icon: DollarSign },
+    ],
+  },
+  {
+    title: "Afiliados",
+    items: [
+      { to: "/affiliates", label: "Afiliados", icon: Users },
+      { to: "/businesses", label: "Businesses", icon: Building2 },
+      { to: "/commissions", label: "Comissões", icon: Coins },
     ],
   },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth();
+  const { data: me } = useMe();
   const navigate = useNavigate();
+  const sections =
+    me?.role === "admin" ? adminSections : me?.role === "business" ? businessSections : affiliateSections;
 
   const handleSignOut = async () => {
     await signOut();

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Plus, Copy, Pause, Play, Check, Loader2 } from "lucide-react";
-import { useCoupons, useCouponMutations } from "@/hooks/useBoCoupons";
+import { useCoupons, useCouponMutations, useAffiliates, useMe } from "@/hooks/useBoCoupons";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { boCoupons } from "@/lib/boCoupons";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/input";
@@ -44,13 +45,16 @@ export function CouponsPage() {
   const [kind, setKind] = useState<CouponDiscountKind | "">("");
   const [editing, setEditing] = useState<Coupon | null>(null);
   const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState<Coupon | null>(null);
 
   const { data, isLoading, error } = useCoupons({
     status: status || undefined,
     discountKind: kind || undefined,
     search: search || undefined,
   });
-  const { update } = useCouponMutations();
+  const { update, remove } = useCouponMutations();
+  const { data: me } = useMe();
+  const isBusiness = me?.role === "business";
 
   const copyCode = (code: string) => {
     navigator.clipboard?.writeText(code);
@@ -66,7 +70,9 @@ export function CouponsPage() {
         <div>
           <h1 className="text-xl font-semibold">Cupons</h1>
           <p className="text-sm text-muted-foreground">
-            Cupons de desconto e teste grátis. Criados aqui já valem no checkout/paywall do TikTally.
+            {isBusiness
+              ? "Cupons dos afiliados da sua carteira. Valem no checkout do TikTally assim que criados."
+              : "Cupons de desconto e teste grátis. Criados aqui já valem no checkout/paywall do TikTally."}
           </p>
         </div>
         <Button onClick={() => setCreating(true)}>
@@ -167,6 +173,9 @@ export function CouponsPage() {
                         <Button variant="ghost" size="sm" onClick={() => setEditing(c)}>
                           Editar
                         </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setDeleting(c)}>
+                          Excluir
+                        </Button>
                       </div>
                     </TD>
                   </TR>
@@ -179,6 +188,23 @@ export function CouponsPage() {
 
       {(creating || editing) && (
         <CouponFormDialog coupon={editing} onClose={() => (editing ? setEditing(null) : setCreating(false))} />
+      )}
+
+      {deleting && (
+        <ConfirmDialog
+          title={`Excluir ${deleting.code}?`}
+          confirmLabel="Excluir"
+          loading={remove.isPending}
+          onClose={() => setDeleting(null)}
+          onConfirm={() => remove.mutate(deleting.id, { onSuccess: () => setDeleting(null) })}
+          description={
+            <>
+              Se o cupom <strong>já foi resgatado</strong>, ele é <strong>arquivado</strong> em vez de
+              excluído: bloqueia novos usos, mas quem já assinou mantém o desconto. Sem resgates, é
+              removido de vez.
+            </>
+          }
+        />
       )}
     </div>
   );
@@ -203,6 +229,17 @@ function CouponFormDialog({ coupon, onClose }: { coupon: Coupon | null; onClose:
   const [validUntil, setValidUntil] = useState(coupon?.valid_until?.slice(0, 10) ?? "");
   const [plans, setPlans] = useState<string[]>(coupon?.applicable_plans ?? []);
   const [cycles, setCycles] = useState<string[]>(coupon?.applicable_cycles ?? []);
+  const [affiliateId, setAffiliateId] = useState(coupon?.affiliate_id ?? "");
+  const [appliesToRenewals, setAppliesToRenewals] = useState(coupon?.applies_to_renewals ?? true);
+  const { data: affData } = useAffiliates();
+  const { data: me } = useMe();
+  const isBusiness = me?.role === "business";
+  const pool = me?.commission_pool_percent ?? 30;
+  const percentOptions = me?.coupon_percent_options ?? [10, 15, 20];
+  const ownMax = me?.own_coupon_max_percent ?? 10;
+  // Sem afiliado o cupom é "da própria conta" → teto menor.
+  const maxPercent = affiliateId ? Math.max(...percentOptions) : ownMax;
+  const businessPercent = Number(discountInput) || percentOptions[0];
 
   const [codeCheck, setCodeCheck] = useState<{ checking: boolean; available: boolean | null; reason: string | null }>({
     checking: false,
@@ -235,13 +272,22 @@ function CouponFormDialog({ coupon, onClose }: { coupon: Coupon | null; onClose:
     discountInput !== "" &&
     Number.isFinite(discountNum) &&
     (kind === "PERCENTAGE" ? discountNum >= 0 && discountNum <= 100 : discountNum > 0);
-  const canSubmit = code.trim().length >= 3 && codeCheck.available !== false && discountValid && !busy;
+  const canSubmit =
+    code.trim().length >= 3 &&
+    codeCheck.available !== false &&
+    // Business: desconto precisa respeitar o teto do tipo de cupom.
+    (isBusiness ? businessPercent <= maxPercent : discountValid) &&
+    !busy;
 
   const toggle = (arr: string[], v: string, set: (a: string[]) => void) =>
     set(arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
 
   const submit = () => {
-    const discount = kind === "FIXED" ? Math.round(discountNum * 100) : Math.round(discountNum);
+    const discount = isBusiness
+      ? businessPercent
+      : kind === "FIXED"
+        ? Math.round(discountNum * 100)
+        : Math.round(discountNum);
     const input: CouponInput = {
       code: code.trim().toUpperCase(),
       description: description || null,
@@ -252,6 +298,8 @@ function CouponFormDialog({ coupon, onClose }: { coupon: Coupon | null; onClose:
       valid_until: validUntil ? new Date(validUntil + "T23:59:59").toISOString() : null,
       applicable_plans: plans.length ? plans : null,
       applicable_cycles: cycles.length ? cycles : null,
+      affiliate_id: affiliateId || null,
+      applies_to_renewals: appliesToRenewals,
     };
     if (isEdit) update.mutate({ id: coupon!.id, input }, { onSuccess: onClose });
     else create.mutate(input, { onSuccess: onClose });
@@ -283,29 +331,60 @@ function CouponFormDialog({ coupon, onClose }: { coupon: Coupon | null; onClose:
           <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex.: 30% off Black Friday" />
         </Field>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Tipo de desconto">
-            <Select value={kind} onChange={(e) => setKind(e.target.value as CouponDiscountKind)}>
-              <option value="PERCENTAGE">Desconto %</option>
-              <option value="FIXED">Desconto fixo (R$)</option>
-              <option value="TRIAL_DAYS">Teste grátis (dias)</option>
-            </Select>
-          </Field>
-          <Field label={`Valor (${discountUnit})`}>
-            <Input
-              type="number"
-              min={0}
-              step={kind === "FIXED" ? "0.01" : "1"}
-              value={discountInput}
-              onChange={(e) => setDiscountInput(e.target.value)}
-              placeholder={kind === "PERCENTAGE" ? "30" : kind === "FIXED" ? "150,00" : "7"}
-            />
-          </Field>
-        </div>
-        {kind === "TRIAL_DAYS" && (
-          <p className="-mt-2 text-xs text-muted-foreground">
-            Cupom de teste grátis: resgatado na tela de planos, cria um trial sem cobrança.
-          </p>
+        {isBusiness ? (
+          <div className="space-y-2 rounded-md border border-border p-3">
+            <Field label="Desconto do cupom">
+              <Select value={String(businessPercent)} onChange={(e) => setDiscountInput(e.target.value)}>
+                {percentOptions.map((pct) => (
+                  <option key={pct} value={pct} disabled={pct > maxPercent}>
+                    {pct}%{pct > maxPercent ? " — requer afiliado" : ""}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <div className="rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
+              <p>
+                Comissão gerada: <strong className="text-foreground">{Math.max(0, pool - businessPercent)}%</strong> do
+                valor pago pelo cliente{" "}
+                <span className="opacity-70">
+                  ({pool}% de gestão − {businessPercent}% de desconto)
+                </span>
+                .
+              </p>
+              <p className="mt-1">
+                {affiliateId
+                  ? "Cupom de afiliado da carteira — até " + Math.max(...percentOptions) + "%."
+                  : `Cupom da sua conta — até ${ownMax}%. Vincule um afiliado para liberar descontos maiores.`}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Tipo de desconto">
+                <Select value={kind} onChange={(e) => setKind(e.target.value as CouponDiscountKind)}>
+                  <option value="PERCENTAGE">Desconto %</option>
+                  <option value="FIXED">Desconto fixo (R$)</option>
+                  <option value="TRIAL_DAYS">Teste grátis (dias)</option>
+                </Select>
+              </Field>
+              <Field label={`Valor (${discountUnit})`}>
+                <Input
+                  type="number"
+                  min={0}
+                  step={kind === "FIXED" ? "0.01" : "1"}
+                  value={discountInput}
+                  onChange={(e) => setDiscountInput(e.target.value)}
+                  placeholder={kind === "PERCENTAGE" ? "30" : kind === "FIXED" ? "150,00" : "7"}
+                />
+              </Field>
+            </div>
+            {kind === "TRIAL_DAYS" && (
+              <p className="-mt-2 text-xs text-muted-foreground">
+                Cupom de teste grátis: resgatado na tela de planos, cria um trial sem cobrança.
+              </p>
+            )}
+          </>
         )}
 
         <div className="grid grid-cols-2 gap-3">
@@ -334,7 +413,7 @@ function CouponFormDialog({ coupon, onClose }: { coupon: Coupon | null; onClose:
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className={`grid grid-cols-2 gap-3 ${isBusiness ? "hidden" : ""}`}>
           <div>
             <p className="mb-1 text-xs font-medium text-muted-foreground">Planos (vazio = todos)</p>
             <div className="flex flex-wrap gap-2">
@@ -355,6 +434,32 @@ function CouponFormDialog({ coupon, onClose }: { coupon: Coupon | null; onClose:
               ))}
             </div>
           </div>
+        </div>
+
+        <div className="space-y-3 rounded-md border border-border p-3">
+          <Field label={isBusiness ? "Afiliado da carteira (opcional)" : "Afiliado (dono do cupom)"}>
+            <Select value={affiliateId} onChange={(e) => setAffiliateId(e.target.value)} disabled={isBusiness && isEdit}>
+              <option value="">
+                {isBusiness ? "— Sem afiliado (cupom da minha conta)" : "— Sem afiliado (cupom da casa)"}
+              </option>
+              {(affData?.items ?? []).map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                  {!isBusiness && a.business_name ? ` · ${a.business_name}` : ""}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          {isBusiness ? (
+            <p className="text-xs text-muted-foreground">
+              O desconto vale também nas renovações (vitalício) — regra do programa.
+            </p>
+          ) : (
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input type="checkbox" checked={appliesToRenewals} onChange={(e) => setAppliesToRenewals(e.target.checked)} />
+              Desconto vale nas renovações (vitalício)
+            </label>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 pt-2">

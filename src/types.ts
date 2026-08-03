@@ -142,6 +142,8 @@ export interface Coupon {
   valid_until: string | null;
   applicable_plans: string[] | null;
   applicable_cycles: string[] | null;
+  affiliate_id: string | null;
+  applies_to_renewals: boolean;
   metadata: Record<string, unknown> | null;
   created_at: string | null;
   updated_at: string | null;
@@ -160,7 +162,17 @@ export interface CouponRedemption {
   /** Enriquecido pelo gateway. */
   coupon_code?: string | null;
   coupon_kind?: CouponDiscountKind | null;
+  /** Mascarado (jo***@dominio) para business/afiliado; completo só p/ admin. */
   user_email?: string | null;
+  /** Snapshots do momento do uso (programa de afiliados). */
+  affiliate_id?: string | null;
+  business_id?: string | null;
+  plan_key?: string | null;
+  cycle?: string | null;
+  payment_method?: string | null;
+  gross_amount_cents?: number | null;
+  net_amount_cents?: number | null;
+  status?: string | null;
 }
 
 export interface CouponsOverview {
@@ -230,10 +242,214 @@ export interface CouponInput {
   valid_until?: string | null;
   applicable_plans?: string[] | null;
   applicable_cycles?: string[] | null;
+  affiliate_id?: string | null;
+  applies_to_renewals?: boolean;
 }
 
 export interface CodeCheck {
   code: string;
   available: boolean;
   reason: string | null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Afiliados, Businesses, Comissões, Planos & Preços (Fase 5 — Admin).
+// Espelham as tabelas plans/prices/settings/affiliates/businesses/commissions.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Papel do usuário logado no backoffice (resolvido server-side pelo gateway). */
+export type BoRole = "admin" | "business" | "affiliate" | "none";
+
+export interface MeInfo {
+  user_id: string;
+  role: BoRole;
+  business_id: string | null;
+  affiliate_id: string | null;
+  scope_name: string | null;
+  /** % padrão do cupom de afiliado. */
+  coupon_discount_percent: number;
+  /** Pool de gestão: comissão % = pool − desconto do cupom. */
+  commission_pool_percent: number;
+  /** Descontos que o business pode escolher (ex.: [10, 15, 20]). */
+  coupon_percent_options: number[];
+  /** Teto do cupom da própria conta do business (sem afiliado). */
+  own_coupon_max_percent: number;
+}
+
+export interface BusinessUserInput {
+  business_id: string;
+  email: string;
+  password: string;
+}
+
+/** Cupom do afiliado com o link de divulgação pronto. */
+export interface MyCoupon {
+  id: string;
+  code: string;
+  description: string | null;
+  discount: number;
+  discount_kind: CouponDiscountKind | string;
+  status: string;
+  max_redeems: number;
+  redeems_count: number;
+  valid_until: string | null;
+  applies_to_renewals: boolean;
+  exhausted?: boolean;
+  share_url: string;
+}
+
+/** Painel do afiliado: cupons + desempenho consolidado. */
+export interface MyPerformance {
+  affiliate: { id: string; name: string; pix_key: string | null; status: string } | null;
+  coupons: MyCoupon[];
+  performance: {
+    uses: number;
+    active_subscriptions: number;
+    revenue_cents: number;
+    commission_pending_cents: number;
+    commission_paid_cents: number;
+    by_day: Array<{ day: string; count: number }>;
+  };
+}
+
+/** Resultado de exclusão: o servidor pode ter feito soft delete por histórico. */
+export interface DeleteResult {
+  id: string;
+  deleted: boolean;
+  archived?: boolean;
+  suspended?: boolean;
+  reason: string | null;
+}
+
+export type EntityStatus = "active" | "suspended";
+export type CommissionType = "fixed" | "percent";
+export type CommissionStatus = "pending" | "approved" | "paid" | "cancelled" | "reversed";
+
+export interface Plan {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  status: string;
+  sort_order: number;
+}
+
+export interface Price {
+  id: string;
+  plan_id: string;
+  cycle: BillingCycle | string;
+  installments: number;
+  installment_amount_cents: number;
+  total_amount_cents: number;
+  active: boolean;
+}
+
+export interface Setting {
+  key: string;
+  value: unknown;
+  description: string | null;
+}
+
+export interface PricingData {
+  plans: Plan[];
+  prices: Price[];
+  settings: Setting[];
+}
+
+export interface Business {
+  id: string;
+  owner_user_id: string | null;
+  name: string;
+  email: string | null;
+  status: EntityStatus | string;
+  notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  affiliates_count?: number;
+}
+
+export interface Affiliate {
+  id: string;
+  user_id: string | null;
+  business_id: string | null;
+  name: string;
+  email: string | null;
+  pix_key: string | null;
+  status: EntityStatus | string;
+  default_commission_type: CommissionType | string;
+  default_commission_value: number;
+  created_at: string | null;
+  updated_at: string | null;
+  business_name?: string | null;
+}
+
+export interface Commission {
+  id: string;
+  redemption_id: string;
+  affiliate_id: string;
+  business_id: string | null;
+  amount_cents: number;
+  commission_type: CommissionType | string;
+  commission_value: number;
+  status: CommissionStatus | string;
+  eligible_at: string | null;
+  approved_at: string | null;
+  paid_at: string | null;
+  paid_by: string | null;
+  payment_reference: string | null;
+  notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  affiliate_name?: string | null;
+  affiliate_pix_key?: string | null;
+  eligible?: boolean;
+}
+
+export interface AffiliateInput {
+  name: string;
+  email?: string | null;
+  business_id?: string | null;
+  pix_key?: string | null;
+  status?: EntityStatus;
+  default_commission_type?: CommissionType;
+  default_commission_value?: number;
+}
+
+export interface BusinessInput {
+  name: string;
+  email?: string | null;
+  status?: EntityStatus;
+  notes?: string | null;
+}
+
+export interface AffiliateFilters {
+  businessId?: string;
+  status?: EntityStatus;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface CommissionFilters {
+  status?: "pending" | "eligible" | "approved" | "paid" | "cancelled" | "reversed";
+  affiliateId?: string;
+  businessId?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedAffiliates {
+  items: Affiliate[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface PaginatedCommissions {
+  items: Commission[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
