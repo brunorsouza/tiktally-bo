@@ -163,6 +163,9 @@ Dialog de form, `Field`/`Chip`, estados loading/error/empty).
 - **Unicidade vitalícia**: 1 cupom por usuário, para sempre
   (`coupon_redemptions.redeemed_by_user_id UNIQUE`). Churn **não** recupera o
   desconto — volta a preço cheio (salvo exceção manual do admin).
+- **Renovação (travado)**: sempre a **preço cheio** e **sem comissão** — o cupom
+  vale só na 1ª cobrança. Contraria o MD §1; a decisão do produto prevalece.
+  `applies_to_renewals` / `recurring_discount_percent` são vestigiais.
 - **Desconto do cupom (business)**: opções **10 / 15 / 20%**. Cupom da **própria
   conta** do business (`coupons.business_id`, sem afiliado) = **máx. 10%**; cupom
   de **afiliado da carteira** = até **20%**. Admin não tem esse limite.

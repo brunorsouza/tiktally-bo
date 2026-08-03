@@ -80,6 +80,15 @@ backoffice.
 - Empilhamento **multiplicativo** (×0,80 × 0,95 = ×0,76) — só uma arredondada.
 - Arredondamento em centavos, **round half-up**.
 
+### R7b — Renovação (decisão travada, contraria o MD §1)
+- **Renovação é sempre a PREÇO CHEIO** — o cupom vale só na 1ª cobrança. A
+  recorrência da Asaas e o `billing-renew` devem cobrar o valor cheio da tabela
+  `prices`.
+- **Renovação NÃO gera comissão** (guard `isRenewal` em `billing-create-payment`).
+- `applies_to_renewals` e `subscriptions.recurring_discount_percent` são
+  **vestigiais** — não devem influenciar preço. Não reporte como bug o fato de
+  não serem aplicados.
+
 ### R7 — Ciclo de vida e histórico
 - Cupom com resgate **nunca** é hard-deleted → vira `ARCHIVED`.
 - Afiliado com comissões/resgates **nunca** é apagado → vira `suspended`

@@ -356,6 +356,7 @@ function CouponFormDialog({ coupon, onClose }: { coupon: Coupon | null; onClose:
                   ? "Cupom de afiliado da carteira — até " + Math.max(...percentOptions) + "%."
                   : `Cupom da sua conta — até ${ownMax}%. Vincule um afiliado para liberar descontos maiores.`}
               </p>
+              <p className="mt-1 opacity-70">Vale só na 1ª cobrança; renovação é a preço cheio.</p>
             </div>
           </div>
         ) : (
@@ -450,16 +451,10 @@ function CouponFormDialog({ coupon, onClose }: { coupon: Coupon | null; onClose:
               ))}
             </Select>
           </Field>
-          {isBusiness ? (
-            <p className="text-xs text-muted-foreground">
-              O desconto vale também nas renovações (vitalício) — regra do programa.
-            </p>
-          ) : (
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
-              <input type="checkbox" checked={appliesToRenewals} onChange={(e) => setAppliesToRenewals(e.target.checked)} />
-              Desconto vale nas renovações (vitalício)
-            </label>
-          )}
+          <p className="text-xs text-muted-foreground">
+            O desconto vale na <strong>1ª cobrança</strong>. A renovação é sempre a preço cheio — e
+            só o primeiro pagamento gera comissão.
+          </p>
         </div>
 
         <div className="flex justify-end gap-2 pt-2">

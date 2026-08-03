@@ -33,6 +33,14 @@ decisão do produto.
 fica em **~72%**, não exatamente 70%; e o **−5% do PIX reduz a comissão** na
 mesma proporção (ex.: cupom 20% + PIX → comissão = 10% × 76% = 7,6% do tabela).
 
+### ⚠️ Renovação (decisão travada — 2026-08-03)
+
+**Renovação é sempre a PREÇO CHEIO e NÃO gera comissão.** O cupom vale só na
+**1ª cobrança**. Isso *contraria* o MD §1 ("desconto permanente, aplicado também
+nas renovações") — a decisão do produto prevalece. Consequência: `applies_to_renewals`
+e `subscriptions.recurring_discount_percent` viraram **vestigiais** (não afetam
+preço). `coupon_id` na subscription é mantido só como histórico da origem.
+
 - Business escolhe entre **10 / 15 / 20%**. Cupom da **própria conta** (sem
   afiliado) = **máx. 10%**; com **afiliado da carteira** = até **20%**.
 - **Um cupom pertence a UM único afiliado** (decisão travada — sem rateio).

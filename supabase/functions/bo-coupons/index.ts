@@ -42,7 +42,7 @@ const PLANS = ["pro", "erp"] as const;
 const CYCLES = ["semiannually", "yearly"] as const;
 
 const COUPON_COLS =
-  "id, code, description, discount_kind, discount, status, max_redeems, redeems_count, valid_from, valid_until, applicable_plans, applicable_cycles, affiliate_id, applies_to_renewals, metadata, created_at, updated_at";
+  "id, code, description, discount_kind, discount, status, max_redeems, redeems_count, valid_from, valid_until, applicable_plans, applicable_cycles, affiliate_id, business_id, applies_to_renewals, metadata, created_at, updated_at";
 const AFFILIATE_COLS =
   "id, user_id, business_id, name, email, pix_key, status, default_commission_type, default_commission_value, created_at, updated_at";
 const BUSINESS_COLS = "id, owner_user_id, name, email, status, notes, created_at, updated_at";
@@ -300,8 +300,16 @@ async function actionGetCoupon(db: SupabaseClient, p: Record<string, any>, ctx: 
     .order("redeemed_at", { ascending: false })
     .limit(200);
 
+  // LGPD: parceiro vê assinante mascarado e sem user_id; só admin vê completo.
   const redemptions = await Promise.all(
-    (reds ?? []).map(async (r: any) => ({ ...r, user_email: await emailFor(db, r.user_id) }))
+    (reds ?? []).map(async (r: any) => {
+      const email = await emailFor(db, r.user_id);
+      return {
+        ...r,
+        user_email: ctx.role === "admin" ? email : maskEmail(email),
+        user_id: ctx.role === "admin" ? r.user_id : undefined,
+      };
+    })
   );
   return ok({ coupon: { ...coupon, exhausted: isExhausted(coupon) }, redemptions });
 }
@@ -314,7 +322,7 @@ async function actionCheckCode(db: SupabaseClient, p: Record<string, any>) {
   return ok({ code, available: !exists, reason: exists ? "Código já em uso" : null });
 }
 
-async function actionCreateCoupon(db: SupabaseClient, p: Record<string, any>, ctx: RoleCtx) {
+async function actionCreateCoupon(db: SupabaseClient, p: Record<string, any>, ctx: RoleCtx, actorId: string) {
   const code = normalizeCode(p.code);
   if (!/^[A-Z0-9]{3,32}$/.test(code)) return fail("Código inválido (use 3–32 letras/números)");
 
@@ -350,10 +358,11 @@ async function actionCreateCoupon(db: SupabaseClient, p: Record<string, any>, ct
   };
   const { data, error } = await db.from("coupons").insert(insert).select(COUPON_COLS).single();
   if (error) throw new Error(error.message);
+  await audit(db, actorId, "coupon.create", "coupons", data.id, insert);
   return ok({ ...data, exhausted: isExhausted(data) });
 }
 
-async function actionUpdateCoupon(db: SupabaseClient, p: Record<string, any>, ctx: RoleCtx) {
+async function actionUpdateCoupon(db: SupabaseClient, p: Record<string, any>, ctx: RoleCtx, actorId: string) {
   if (!p.id) return fail("id obrigatório");
   const { data: current } = await db.from("coupons").select("id").eq("id", p.id).maybeSingle();
   if (!current) return fail("Cupom não encontrado", 404);
@@ -382,6 +391,7 @@ async function actionUpdateCoupon(db: SupabaseClient, p: Record<string, any>, ct
 
   const { data, error } = await db.from("coupons").update(updates).eq("id", p.id).select(COUPON_COLS).single();
   if (error) throw new Error(error.message);
+  await audit(db, actorId, "coupon.update", "coupons", String(p.id), updates);
   return ok({ ...data, exhausted: isExhausted(data) });
 }
 
@@ -669,7 +679,10 @@ async function actionDeleteAffiliate(db: SupabaseClient, p: Record<string, any>,
     db.from("coupons").select("id, redeems_count").eq("affiliate_id", id),
   ]);
 
-  const hasHistory = (comCount ?? 0) > 0 || (redCount ?? 0) > 0;
+  // Ter CUPOM conta como histórico. Antes, apagar o afiliado desvinculava os
+  // cupons (viravam "da casa") — o que permitia burlar o teto de 10% do cupom
+  // da própria conta: criar afiliado → cupom de 20% → apagar o afiliado.
+  const hasHistory = (comCount ?? 0) > 0 || (redCount ?? 0) > 0 || (coupons?.length ?? 0) > 0;
   if (hasHistory) {
     const { error } = await db
       .from("affiliates")
@@ -679,17 +692,18 @@ async function actionDeleteAffiliate(db: SupabaseClient, p: Record<string, any>,
     await audit(db, actorId, "affiliate.suspend_instead_of_delete", "affiliates", id, {
       commissions: comCount ?? 0,
       redemptions: redCount ?? 0,
+      coupons: coupons?.length ?? 0,
     });
-    return ok({ id, deleted: false, suspended: true, reason: "Afiliado tem histórico — foi suspenso em vez de excluído." });
+    const why = (coupons?.length ?? 0) > 0 && (comCount ?? 0) === 0 && (redCount ?? 0) === 0
+      ? "Afiliado tem cupom vinculado — foi suspenso em vez de excluído. Exclua os cupons dele primeiro."
+      : "Afiliado tem histórico — foi suspenso em vez de excluído.";
+    return ok({ id, deleted: false, suspended: true, reason: why });
   }
 
-  // Sem histórico: desvincula cupons (viram "da casa") e apaga.
-  if (coupons?.length) {
-    await db.from("coupons").update({ affiliate_id: null }).eq("affiliate_id", id);
-  }
+  // Sem cupons e sem histórico: pode apagar de fato.
   const { error } = await db.from("affiliates").delete().eq("id", id);
   if (error) throw new Error(error.message);
-  await audit(db, actorId, "affiliate.delete", "affiliates", id, { unlinked_coupons: coupons?.length ?? 0 });
+  await audit(db, actorId, "affiliate.delete", "affiliates", id, {});
   return ok({ id, deleted: true, suspended: false, reason: null });
 }
 
@@ -1126,9 +1140,9 @@ Deno.serve(async (req) => {
       case "get_coupon":
         return await actionGetCoupon(db, body, ctx);
       case "create_coupon":
-        return await actionCreateCoupon(db, body, ctx);
+        return await actionCreateCoupon(db, body, ctx, actorId);
       case "update_coupon":
-        return await actionUpdateCoupon(db, body, ctx);
+        return await actionUpdateCoupon(db, body, ctx, actorId);
       case "delete_coupon":
         return await actionDeleteCoupon(db, body, actorId, ctx);
       case "check_code":
