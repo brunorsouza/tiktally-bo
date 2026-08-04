@@ -101,12 +101,12 @@ export function Layout({ children }: { children: ReactNode }) {
       <aside className="sticky top-0 flex h-screen w-[15rem] shrink-0 flex-col border-r border-line bg-surface-1">
         {/* Marca: monograma sólido na cor do produto, não um ícone genérico */}
         <div className="flex items-center gap-2.5 px-4 py-4">
-          <div className="flex h-6 w-6 items-center justify-center rounded-sm bg-brand font-mono text-[0.75rem] font-semibold text-brand-foreground">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-brand text-[0.75rem] font-bold text-brand-foreground">
             T
           </div>
           <div className="min-w-0 leading-tight">
             <p className="text-[0.8125rem] font-semibold tracking-tight text-strong">TikTally</p>
-            <p className="font-mono text-[0.5625rem] uppercase tracking-[0.14em] text-subtle">{papel}</p>
+            <p className="text-[0.5625rem] font-semibold uppercase tracking-[0.12em] text-subtle">{papel}</p>
           </div>
         </div>
 

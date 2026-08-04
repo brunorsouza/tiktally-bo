@@ -100,23 +100,21 @@
     font-feature-settings: "cv11", "ss01";
   }
 
-  /* O DADO fala em mono. Valores, códigos, ids, datas, percentuais — tudo que
-     é "registro" usa a mesma voz. É o que faz a tela ler como livro-razão. */
+  /* O mono é reservado ao DADO: valor, código, id, chave, data. Aplicar em
+     `th`/`td` (como estava antes) monoespaçava nome e e-mail junto e a
+     interface inteira lia como terminal — não como Inter. */
   .data,
-  th,
-  td,
   code,
-  input[type="number"],
   .tabular {
     font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "zero"; /* zero cortado: 0 nunca vira O */
   }
 
-  /* Texto corrido dentro da tabela volta pro sans — só o dado é mono */
-  td .prose,
-  th.prose {
-    font-family: Inter, sans-serif;
+  /* Números em tabela alinham em coluna mesmo em Inter */
+  th,
+  td {
+    font-variant-numeric: tabular-nums;
   }
 
   /* Foco visível e consistente — acessibilidade não é opcional */
@@ -167,10 +165,10 @@
   .t-caption {
     @apply text-[0.6875rem] leading-normal text-[hsl(var(--text-muted))];
   }
-  /* Rótulo de seção da navegação */
+  /* Rótulo de seção. Em Inter — o caixa-alta com entreletra já basta pra ler
+     como rótulo, sem precisar da voz de terminal do mono. */
   .t-overline {
-    @apply text-[0.625rem] font-medium uppercase tracking-[0.14em] text-[hsl(var(--text-muted))];
-    font-family: "IBM Plex Mono", monospace;
+    @apply text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-[hsl(var(--text-muted))];
   }
   /* Número em destaque (métricas) */
   .t-metric {

@@ -77,13 +77,13 @@ export default {
           foreground: "hsl(var(--destructive-foreground))",
         },
       },
-      // Raio quase nulo: instrumento, não app de consumo. O canto arredondado
-      // grande é uma das assinaturas do visual "template".
+      // Raio moderado. O quase-zero anterior somado ao mono deixava a tela com
+      // cara de terminal; o exagero arredondado é que dá cara de template.
       borderRadius: {
-        sm: "0.125rem",
-        md: "0.1875rem",
-        lg: "0.25rem",
-        xl: "0.375rem",
+        sm: "0.25rem",
+        md: "0.375rem",
+        lg: "0.5rem",
+        xl: "0.75rem",
       },
       fontFamily: {
         sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],

@@ -1,16 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Plus, Copy, Pause, Play, Check, Loader2 } from "lucide-react";
+import { Search, Plus, Copy, Pause, Play, Check, Loader2, Ticket } from "lucide-react";
 import { useCoupons, useCouponMutations, useAffiliates, useMe } from "@/hooks/useBoCoupons";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { boCoupons } from "@/lib/boCoupons";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input, Select } from "@/components/ui/input";
+import { Input, Select, SearchInput } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
+import { PageHeader, Toolbar, Field, Chip, Note, Checkbox } from "@/components/ds";
+import { DataTable, CellStack, RowActions, type Column } from "@/components/ds/DataTable";
 import { CouponStatusBadge, DiscountKindBadge } from "@/components/CouponBadges";
-import { CenteredSpinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 import { formatDate } from "@/lib/formatters";
 import {
@@ -64,127 +63,140 @@ export function CouponsPage() {
   const toggleStatus = (c: Coupon) =>
     update.mutate({ id: c.id, input: { status: c.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" } });
 
+  const colunas: Column<Coupon>[] = [
+    {
+      header: "Código",
+      cell: (c) => (
+        <CellStack
+          title={<span className="font-mono tracking-tight">{c.code}</span>}
+          subtitle={c.description ?? undefined}
+        />
+      ),
+    },
+    { header: "Tipo", width: "8rem", hideBelow: "md", cell: (c) => <DiscountKindBadge kind={c.discount_kind} /> },
+    {
+      header: "Desconto",
+      align: "right",
+      width: "8.5rem",
+      cell: (c) => <span className="whitespace-nowrap">{discountLabel(c.discount_kind, c.discount)}</span>,
+    },
+    {
+      header: "Resgates",
+      align: "right",
+      width: "7rem",
+      cell: (c) => <span className={c.exhausted ? "text-danger" : ""}>{redeemsLabel(c)}</span>,
+    },
+    {
+      header: "Validade",
+      width: "7rem",
+      hideBelow: "lg",
+      cell: (c) => <span className="tabular text-subtle">{c.valid_until ? formatDate(c.valid_until) : "—"}</span>,
+    },
+    { header: "Status", width: "6rem", cell: (c) => <CouponStatusBadge status={c.status} /> },
+    {
+      header: "",
+      align: "right",
+      width: "11rem",
+      cell: (c) => (
+        <RowActions>
+          <Button variant="ghost" size="icon-sm" title="Copiar código" onClick={() => copyCode(c.code)}>
+            <Copy />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title={c.status === "ACTIVE" ? "Desativar" : "Ativar"}
+            onClick={() => toggleStatus(c)}
+          >
+            {c.status === "ACTIVE" ? <Pause /> : <Play />}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setEditing(c)}>
+            Editar
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setDeleting(c)}>
+            Excluir
+          </Button>
+        </RowActions>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">Cupons</h1>
-          <p className="text-sm text-muted-foreground">
-            {isBusiness
-              ? "Cupons dos afiliados da sua carteira. Valem no checkout do TikTally assim que criados."
-              : "Cupons de desconto e teste grátis. Criados aqui já valem no checkout/paywall do TikTally."}
-          </p>
-        </div>
-        <Button onClick={() => setCreating(true)}>
-          <Plus className="h-4 w-4" /> Novo cupom
-        </Button>
-      </div>
+      <PageHeader
+        title="Cupons"
+        meta={data && <span className="t-overline">{data.items.length}</span>}
+        description={
+          isBusiness
+            ? "Cupons dos afiliados da sua carteira. Valem no checkout do TikTally assim que criados."
+            : "Cupons de desconto e teste grátis. Criados aqui já valem no checkout/paywall do TikTally."
+        }
+        actions={
+          <Button onClick={() => setCreating(true)}>
+            <Plus /> Novo cupom
+          </Button>
+        }
+      />
 
-      <Card>
-        <CardContent className="flex flex-wrap items-center gap-3 pt-5">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setSearch(searchInput.trim());
-            }}
-            className="relative min-w-[200px] flex-1"
-          >
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              className="pl-9"
-              placeholder="Buscar por código ou descrição…"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-            />
-          </form>
-          <Select className="w-40" value={kind} onChange={(e) => setKind(e.target.value as CouponDiscountKind | "")}>
-            {KIND_FILTERS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </Select>
-          <Select className="w-40" value={status} onChange={(e) => setStatus(e.target.value as CouponStatus | "")}>
-            {STATUS_FILTERS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </Select>
-        </CardContent>
-      </Card>
+      <Toolbar>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setSearch(searchInput.trim());
+          }}
+          className="flex min-w-[16rem] flex-1"
+        >
+          <SearchInput
+            icon={<Search />}
+            placeholder="Buscar por código ou descrição…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+        </form>
+        <Select
+          selectSize="sm"
+          className="w-40"
+          value={kind}
+          onChange={(e) => setKind(e.target.value as CouponDiscountKind | "")}
+        >
+          {KIND_FILTERS.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </Select>
+        <Select
+          selectSize="sm"
+          className="w-40"
+          value={status}
+          onChange={(e) => setStatus(e.target.value as CouponStatus | "")}
+        >
+          {STATUS_FILTERS.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </Select>
+      </Toolbar>
 
-      <Card>
-        <CardContent className="pt-5">
-          {isLoading ? (
-            <CenteredSpinner label="Carregando cupons…" />
-          ) : error ? (
-            <p className="py-8 text-center text-sm text-destructive">{(error as Error).message}</p>
-          ) : !data || data.items.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Nenhum cupom encontrado.</p>
-          ) : (
-            <Table>
-              <THead>
-                <TR className="hover:bg-transparent">
-                  <TH>Código</TH>
-                  <TH>Tipo</TH>
-                  <TH>Desconto</TH>
-                  <TH className="text-right">Resgates</TH>
-                  <TH>Validade</TH>
-                  <TH>Status</TH>
-                  <TH className="text-right">Ações</TH>
-                </TR>
-              </THead>
-              <TBody>
-                {data.items.map((c) => (
-                  <TR key={c.id} className="cursor-pointer" onClick={() => navigate(`/coupons/${c.id}`)}>
-                    <TD>
-                      <span className="font-mono font-medium">{c.code}</span>
-                      {c.description && (
-                        <span className="block max-w-[200px] truncate text-xs text-muted-foreground">{c.description}</span>
-                      )}
-                    </TD>
-                    <TD>
-                      <DiscountKindBadge kind={c.discount_kind} />
-                    </TD>
-                    <TD className="tabular-nums">{discountLabel(c.discount_kind, c.discount)}</TD>
-                    <TD className="text-right tabular-nums">
-                      <span className={c.exhausted ? "text-destructive" : ""}>{redeemsLabel(c)}</span>
-                    </TD>
-                    <TD className="whitespace-nowrap text-muted-foreground">
-                      {c.valid_until ? formatDate(c.valid_until) : "—"}
-                    </TD>
-                    <TD>
-                      <CouponStatusBadge status={c.status} />
-                    </TD>
-                    <TD onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" title="Copiar código" onClick={() => copyCode(c.code)}>
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title={c.status === "ACTIVE" ? "Desativar" : "Ativar"}
-                          onClick={() => toggleStatus(c)}
-                        >
-                          {c.status === "ACTIVE" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setEditing(c)}>
-                          Editar
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setDeleting(c)}>
-                          Excluir
-                        </Button>
-                      </div>
-                    </TD>
-                  </TR>
-                ))}
-              </TBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <DataTable
+        rows={data?.items}
+        rowKey={(c) => c.id}
+        loading={isLoading}
+        error={error ? (error as Error).message : null}
+        onRowClick={(c) => navigate(`/coupons/${c.id}`)}
+        empty={{
+          title: "Nenhum cupom encontrado",
+          description: search || status || kind ? "Tente afrouxar os filtros." : "Crie o primeiro cupom do programa.",
+          icon: <Ticket />,
+          action: !search && !status && !kind && (
+            <Button onClick={() => setCreating(true)}>
+              <Plus /> Novo cupom
+            </Button>
+          ),
+        }}
+        columns={colunas}
+      />
 
       {(creating || editing) && (
         <CouponFormDialog coupon={editing} onClose={() => (editing ? setEditing(null) : setCreating(false))} />
@@ -308,23 +320,37 @@ function CouponFormDialog({ coupon, onClose }: { coupon: Coupon | null; onClose:
   const discountUnit = kind === "PERCENTAGE" ? "%" : kind === "FIXED" ? "R$" : "dias";
 
   return (
-    <Dialog open onClose={onClose} title={isEdit ? `Editar ${coupon?.code}` : "Novo cupom"}>
+    <Dialog
+      open
+      onClose={onClose}
+      title={isEdit ? `Editar ${coupon?.code}` : "Novo cupom"}
+      description="O desconto vale na 1ª cobrança; a renovação é sempre a preço cheio."
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancelar
+          </Button>
+          <Button onClick={submit} loading={busy} disabled={!canSubmit}>
+            {isEdit ? "Salvar" : "Criar cupom"}
+          </Button>
+        </>
+      }
+    >
       <div className="space-y-4">
-        <Field label="Código">
+        <Field label="Código" error={codeCheck.reason}>
           <div className="relative">
             <Input
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="BLACK30"
-              className="font-mono uppercase"
+              className="pr-9 font-mono uppercase tracking-wide"
               autoFocus={!isEdit}
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
-              {codeCheck.checking && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-              {!codeCheck.checking && codeCheck.available === true && <Check className="h-4 w-4 text-success" />}
+              {codeCheck.checking && <Loader2 className="h-3.5 w-3.5 animate-spin text-subtle" />}
+              {!codeCheck.checking && codeCheck.available === true && <Check className="h-3.5 w-3.5 text-success" />}
             </div>
           </div>
-          {codeCheck.reason && <p className="mt-1 text-xs text-destructive">{codeCheck.reason}</p>}
         </Field>
 
         <Field label="Descrição (interna)">
@@ -332,7 +358,7 @@ function CouponFormDialog({ coupon, onClose }: { coupon: Coupon | null; onClose:
         </Field>
 
         {isBusiness ? (
-          <div className="space-y-2 rounded-md border border-border p-3">
+          <div className="space-y-3">
             <Field label="Desconto do cupom">
               <Select value={String(businessPercent)} onChange={(e) => setDiscountInput(e.target.value)}>
                 {percentOptions.map((pct) => (
@@ -342,10 +368,12 @@ function CouponFormDialog({ coupon, onClose }: { coupon: Coupon | null; onClose:
                 ))}
               </Select>
             </Field>
-            <div className="rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
+            {/* O número que decide o negócio fica visível ANTES de salvar */}
+            <Note tone="brand">
               <p>
-                Comissão gerada: <strong className="text-foreground">{Math.max(0, pool - businessPercent)}%</strong> do
-                valor pago pelo cliente{" "}
+                Comissão gerada:{" "}
+                <strong className="tabular text-brand-strong">{Math.max(0, pool - businessPercent)}%</strong> do valor
+                pago pelo cliente{" "}
                 <span className="opacity-70">
                   ({pool}% de gestão − {businessPercent}% de desconto)
                 </span>
@@ -353,15 +381,14 @@ function CouponFormDialog({ coupon, onClose }: { coupon: Coupon | null; onClose:
               </p>
               <p className="mt-1">
                 {affiliateId
-                  ? "Cupom de afiliado da carteira — até " + Math.max(...percentOptions) + "%."
+                  ? `Cupom de afiliado da carteira — até ${Math.max(...percentOptions)}%.`
                   : `Cupom da sua conta — até ${ownMax}%. Vincule um afiliado para liberar descontos maiores.`}
               </p>
-              <p className="mt-1 opacity-70">Vale só na 1ª cobrança; renovação é a preço cheio.</p>
-            </div>
+            </Note>
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
               <Field label="Tipo de desconto">
                 <Select value={kind} onChange={(e) => setKind(e.target.value as CouponDiscountKind)}>
                   <option value="PERCENTAGE">Desconto %</option>
@@ -381,14 +408,12 @@ function CouponFormDialog({ coupon, onClose }: { coupon: Coupon | null; onClose:
               </Field>
             </div>
             {kind === "TRIAL_DAYS" && (
-              <p className="-mt-2 text-xs text-muted-foreground">
-                Cupom de teste grátis: resgatado na tela de planos, cria um trial sem cobrança.
-              </p>
+              <Note>Cupom de teste grátis: resgatado na tela de planos, cria um trial sem cobrança.</Note>
             )}
           </>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <Field label="Status">
             <Select value={status} onChange={(e) => setStatus(e.target.value as CouponStatus)}>
               <option value="ACTIVE">Ativo</option>
@@ -400,45 +425,52 @@ function CouponFormDialog({ coupon, onClose }: { coupon: Coupon | null; onClose:
           </Field>
         </div>
 
-        <div className="rounded-md border border-border p-3">
-          <label className="flex cursor-pointer items-center gap-2 text-sm">
-            <input type="checkbox" checked={unlimited} onChange={(e) => setUnlimited(e.target.checked)} />
-            Resgates ilimitados
-          </label>
+        <div className="space-y-3 border-t border-line pt-4">
+          <Checkbox checked={unlimited} onChange={setUnlimited} label="Resgates ilimitados" />
           {!unlimited && (
-            <div className="mt-3">
-              <Field label="Limite de resgates">
-                <Input type="number" min={0} value={maxRedeems} onChange={(e) => setMaxRedeems(e.target.value)} placeholder="200" />
-              </Field>
-            </div>
+            <Field label="Limite de resgates">
+              <Input
+                type="number"
+                min={0}
+                value={maxRedeems}
+                onChange={(e) => setMaxRedeems(e.target.value)}
+                placeholder="200"
+                className="w-32"
+              />
+            </Field>
           )}
         </div>
 
-        <div className={`grid grid-cols-2 gap-3 ${isBusiness ? "hidden" : ""}`}>
-          <div>
-            <p className="mb-1 text-xs font-medium text-muted-foreground">Planos (vazio = todos)</p>
-            <div className="flex flex-wrap gap-2">
-              {PLAN_OPTIONS.map((p) => (
-                <Chip key={p} active={plans.includes(p)} onClick={() => toggle(plans, p, setPlans)}>
-                  {PLAN_LABELS[p]}
-                </Chip>
-              ))}
+        {!isBusiness && (
+          <div className="grid grid-cols-2 gap-4 border-t border-line pt-4">
+            <div>
+              <p className="t-label mb-2">Planos (vazio = todos)</p>
+              <div className="flex flex-wrap gap-1.5">
+                {PLAN_OPTIONS.map((p) => (
+                  <Chip key={p} active={plans.includes(p)} onClick={() => toggle(plans, p, setPlans)}>
+                    {PLAN_LABELS[p]}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="t-label mb-2">Ciclos (vazio = todos)</p>
+              <div className="flex flex-wrap gap-1.5">
+                {CYCLE_OPTIONS.map((c) => (
+                  <Chip key={c} active={cycles.includes(c)} onClick={() => toggle(cycles, c, setCycles)}>
+                    {CYCLE_LABELS[c]}
+                  </Chip>
+                ))}
+              </div>
             </div>
           </div>
-          <div>
-            <p className="mb-1 text-xs font-medium text-muted-foreground">Ciclos (vazio = todos)</p>
-            <div className="flex flex-wrap gap-2">
-              {CYCLE_OPTIONS.map((c) => (
-                <Chip key={c} active={cycles.includes(c)} onClick={() => toggle(cycles, c, setCycles)}>
-                  {CYCLE_LABELS[c]}
-                </Chip>
-              ))}
-            </div>
-          </div>
-        </div>
+        )}
 
-        <div className="space-y-3 rounded-md border border-border p-3">
-          <Field label={isBusiness ? "Afiliado da carteira (opcional)" : "Afiliado (dono do cupom)"}>
+        <div className="space-y-3 border-t border-line pt-4">
+          <Field
+            label={isBusiness ? "Afiliado da carteira (opcional)" : "Afiliado (dono do cupom)"}
+            hint="Só o primeiro pagamento gera comissão."
+          >
             <Select value={affiliateId} onChange={(e) => setAffiliateId(e.target.value)} disabled={isBusiness && isEdit}>
               <option value="">
                 {isBusiness ? "— Sem afiliado (cupom da minha conta)" : "— Sem afiliado (cupom da casa)"}
@@ -451,46 +483,10 @@ function CouponFormDialog({ coupon, onClose }: { coupon: Coupon | null; onClose:
               ))}
             </Select>
           </Field>
-          <p className="text-xs text-muted-foreground">
-            O desconto vale na <strong>1ª cobrança</strong>. A renovação é sempre a preço cheio — e
-            só o primeiro pagamento gera comissão.
-          </p>
-        </div>
-
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={onClose} disabled={busy}>
-            Cancelar
-          </Button>
-          <Button onClick={submit} loading={busy} disabled={!canSubmit}>
-            {isEdit ? "Salvar" : "Criar cupom"}
-          </Button>
         </div>
       </div>
     </Dialog>
   );
 }
 
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-        active
-          ? "border-primary bg-primary text-primary-foreground"
-          : "border-border text-muted-foreground hover:bg-muted"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>
-      {children}
-    </label>
-  );
-}

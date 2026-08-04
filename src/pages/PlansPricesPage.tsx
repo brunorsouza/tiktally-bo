@@ -1,14 +1,12 @@
 import { useState } from "react";
 import { Pencil } from "lucide-react";
 import { usePricing, usePricingMutations } from "@/hooks/useBoCoupons";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
-import { CenteredSpinner } from "@/components/ui/spinner";
-import { formatCurrency } from "@/lib/formatters";
-import { PLAN_LABELS, CYCLE_LABELS } from "@/lib/coupons";
+import { PageHeader, Surface, Field, Note, Money, Status, ErrorState, TableSkeleton } from "@/components/ds";
+import { DataTable, RowActions, type Column } from "@/components/ds/DataTable";
+import { CYCLE_LABELS, PLAN_LABELS, INTERNAL_PLAN_KEYS } from "@/lib/coupons";
 import type { Price, Setting } from "@/types";
 
 const CYCLE_ORDER: Record<string, number> = { yearly: 0, semiannually: 1 };
@@ -30,56 +28,68 @@ export function PlansPricesPage() {
         (CYCLE_ORDER[a.cycle] ?? 9) - (CYCLE_ORDER[b.cycle] ?? 9)
     );
 
+  /** Plano interno (só validação de fluxo) — não é preço de produto. */
+  const isInternal = (planId: string) => INTERNAL_PLAN_KEYS.has(planFor(planId)?.key ?? "");
+
+  const colunas: Column<Price>[] = [
+    {
+      header: "Plano",
+      cell: (pr) => (
+        <span className="flex items-center gap-2">
+          <span className="font-medium text-strong">{planLabel(pr.plan_id)}</span>
+          {/* Um R$10 numa tabela de milhares confunde — deixa explícito */}
+          {isInternal(pr.plan_id) && <Status tone="warning">interno</Status>}
+        </span>
+      ),
+    },
+    { header: "Ciclo", width: "9rem", cell: (pr) => CYCLE_LABELS[pr.cycle] ?? pr.cycle },
+    { header: "Parcelas", align: "right", width: "7rem", cell: (pr) => `${pr.installments}×` },
+    {
+      header: "Parcela (cartão)",
+      align: "right",
+      width: "10rem",
+      cell: (pr) => <Money cents={pr.installment_amount_cents} />,
+    },
+    {
+      header: "Total do ciclo",
+      align: "right",
+      width: "10rem",
+      cell: (pr) => <Money cents={pr.total_amount_cents} className="font-medium text-strong" />,
+    },
+    {
+      header: "",
+      align: "right",
+      width: "6rem",
+      cell: (pr) => (
+        <RowActions>
+          <Button variant="ghost" size="sm" onClick={() => setEditing(pr)}>
+            <Pencil /> Editar
+          </Button>
+        </RowActions>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold">Planos &amp; Preços</h1>
-        <p className="text-sm text-muted-foreground">
-          Fonte única de preço do checkout (<span className="font-mono">GET /pricing</span>). Alterações valem para
-          novas assinaturas e ficam registradas em auditoria.
-        </p>
-      </div>
+      <PageHeader
+        title="Planos & Preços"
+        description={
+          <>
+            Fonte única de preço do checkout (<span className="font-mono text-strong">GET /pricing</span>). Alterações
+            valem para novas assinaturas e ficam registradas em auditoria.
+          </>
+        }
+      />
 
       {isLoading ? (
-        <CenteredSpinner label="Carregando planos e preços…" />
+        <TableSkeleton cols={6} />
       ) : error ? (
-        <p className="py-8 text-center text-sm text-destructive">{(error as Error).message}</p>
+        <ErrorState message={(error as Error).message} />
       ) : data ? (
         <>
-          <SettingsCard settings={data.settings} />
-
-          <Card>
-            <CardContent className="pt-5">
-              <Table>
-                <THead>
-                  <TR className="hover:bg-transparent">
-                    <TH>Plano</TH>
-                    <TH>Ciclo</TH>
-                    <TH className="text-right">Parcelas</TH>
-                    <TH className="text-right">Parcela (cartão)</TH>
-                    <TH className="text-right">Total do ciclo</TH>
-                    <TH className="text-right">Ações</TH>
-                  </TR>
-                </THead>
-                <TBody>
-                  {sortedPrices.map((pr) => (
-                    <TR key={pr.id}>
-                      <TD className="font-medium">{planLabel(pr.plan_id)}</TD>
-                      <TD>{CYCLE_LABELS[pr.cycle] ?? pr.cycle}</TD>
-                      <TD className="text-right tabular-nums">{pr.installments}×</TD>
-                      <TD className="text-right tabular-nums">{formatCurrency(pr.installment_amount_cents / 100)}</TD>
-                      <TD className="text-right tabular-nums">{formatCurrency(pr.total_amount_cents / 100)}</TD>
-                      <TD className="text-right">
-                        <Button variant="ghost" size="sm" onClick={() => setEditing(pr)}>
-                          <Pencil className="h-4 w-4" /> Editar
-                        </Button>
-                      </TD>
-                    </TR>
-                  ))}
-                </TBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <SettingsPanel settings={data.settings} />
+          <DataTable rows={sortedPrices} rowKey={(pr) => pr.id} columns={colunas} />
         </>
       ) : null}
 
@@ -102,7 +112,7 @@ function settingString(settings: Setting[], key: string, fallback: string): stri
   return typeof v === "string" ? v : fallback;
 }
 
-function SettingsCard({ settings }: { settings: Setting[] }) {
+function SettingsPanel({ settings }: { settings: Setting[] }) {
   const { updateSetting } = usePricingMutations();
   const [coupon, setCoupon] = useState(String(settingNumber(settings, "coupon_discount_percent", 20)));
   const [pix, setPix] = useState(String(settingNumber(settings, "pix_discount_percent", 5)));
@@ -117,42 +127,37 @@ function SettingsCard({ settings }: { settings: Setting[] }) {
   };
 
   return (
-    <Card>
-      <CardContent className="space-y-4 pt-5">
-        <p className="text-sm font-medium">Regras de desconto e comissão</p>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <SettingField label="Desconto cupom (%)">
-            <Input type="number" min={0} max={100} value={coupon} onChange={(e) => setCoupon(e.target.value)} />
-          </SettingField>
-          <SettingField label="Desconto PIX (%)">
-            <Input type="number" min={0} max={100} value={pix} onChange={(e) => setPix(e.target.value)} />
-          </SettingField>
-          <SettingField label="Carência comissão (dias)">
-            <Input type="number" min={0} value={hold} onChange={(e) => setHold(e.target.value)} />
-          </SettingField>
-          <SettingField label="Empilhamento">
-            <Select value={stacking} onChange={(e) => setStacking(e.target.value)}>
-              <option value="multiplicative">Multiplicativo (×0,80×0,95)</option>
-              <option value="additive">Aditivo</option>
-            </Select>
-          </SettingField>
-        </div>
-        <div className="flex justify-end">
-          <Button onClick={save} loading={updateSetting.isPending}>
-            Salvar regras
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+    <Surface className="p-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="t-label">Regras de desconto e comissão</p>
+        <Button size="sm" onClick={save} loading={updateSetting.isPending}>
+          Salvar regras
+        </Button>
+      </div>
 
-function SettingField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>
-      {children}
-    </label>
+      <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+        <Field label="Desconto cupom (%)">
+          <Input type="number" min={0} max={100} value={coupon} onChange={(e) => setCoupon(e.target.value)} />
+        </Field>
+        <Field label="Desconto PIX (%)">
+          <Input type="number" min={0} max={100} value={pix} onChange={(e) => setPix(e.target.value)} />
+        </Field>
+        <Field label="Carência comissão (dias)">
+          <Input type="number" min={0} value={hold} onChange={(e) => setHold(e.target.value)} />
+        </Field>
+        <Field label="Empilhamento">
+          <Select value={stacking} onChange={(e) => setStacking(e.target.value)}>
+            <option value="multiplicative">Multiplicativo (×0,80×0,95)</option>
+            <option value="additive">Aditivo</option>
+          </Select>
+        </Field>
+      </div>
+
+      <Note className="mt-4">
+        A carência é a janela de refund: a comissão só fica elegível depois dela. Mexer aqui muda o
+        cálculo das próximas comissões, não das já geradas.
+      </Note>
+    </Surface>
   );
 }
 
@@ -178,27 +183,35 @@ function PriceDialog({ price, planLabel, onClose }: { price: Price; planLabel: s
   };
 
   return (
-    <Dialog open onClose={onClose} title={`Preço — ${planLabel} ${cycleLabel}`}>
-      <div className="space-y-4">
-        <p className="text-xs text-muted-foreground">
-          {price.installments}× no cartão · o total é a base do PIX à vista. Valores em reais.
-        </p>
-        <div className="grid grid-cols-2 gap-3">
-          <SettingField label="Parcela (R$)">
-            <Input type="number" min={0} step="0.01" value={installment} onChange={(e) => setInstallment(e.target.value)} />
-          </SettingField>
-          <SettingField label="Total do ciclo (R$)">
-            <Input type="number" min={0} step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} />
-          </SettingField>
-        </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={onClose} disabled={updatePrice.isPending}>
+    <Dialog
+      open
+      onClose={onClose}
+      title={`${planLabel} · ${cycleLabel}`}
+      description={`${price.installments}× no cartão — o total é a base do PIX à vista. Valores em reais.`}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={updatePrice.isPending}>
             Cancelar
           </Button>
           <Button onClick={submit} loading={updatePrice.isPending}>
             Salvar
           </Button>
-        </div>
+        </>
+      }
+    >
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Parcela (R$)">
+          <Input
+            type="number"
+            min={0}
+            step="0.01"
+            value={installment}
+            onChange={(e) => setInstallment(e.target.value)}
+          />
+        </Field>
+        <Field label="Total do ciclo (R$)">
+          <Input type="number" min={0} step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} />
+        </Field>
       </div>
     </Dialog>
   );

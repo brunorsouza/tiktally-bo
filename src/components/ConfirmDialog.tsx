@@ -2,7 +2,12 @@ import type { ReactNode } from "react";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-/** Confirmação para ações destrutivas (excluir/arquivar). */
+/**
+ * Confirmação para ações destrutivas (excluir/arquivar).
+ *
+ * O botão que confirma usa a variante `danger`: a cor é o aviso. Um "Excluir"
+ * na cor da marca é a armadilha clássica de quem clica no automático.
+ */
 export function ConfirmDialog({
   title,
   description,
@@ -19,18 +24,23 @@ export function ConfirmDialog({
   onClose: () => void;
 }) {
   return (
-    <Dialog open onClose={onClose} title={title}>
-      <div className="space-y-4">
-        <div className="text-sm text-muted-foreground">{description}</div>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={onClose} disabled={loading}>
+    <Dialog
+      open
+      onClose={onClose}
+      title={title}
+      className="max-w-[26rem]"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={loading}>
             Cancelar
           </Button>
-          <Button onClick={onConfirm} loading={loading}>
+          <Button variant="danger" onClick={onConfirm} loading={loading}>
             {confirmLabel}
           </Button>
-        </div>
-      </div>
+        </>
+      }
+    >
+      <div className="t-body leading-relaxed">{description}</div>
     </Dialog>
   );
 }

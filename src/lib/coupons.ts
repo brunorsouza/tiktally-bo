@@ -1,7 +1,14 @@
 import { formatCurrency } from "./formatters";
 import type { Coupon, CouponDiscountKind } from "@/types";
 
-export const PLAN_LABELS: Record<string, string> = { pro: "Pro", erp: "ERP" };
+export const PLAN_LABELS: Record<string, string> = { pro: "Pro", erp: "ERP", test: "Teste" };
+
+/**
+ * Planos que não são produto — existem só pra validar fluxo interno.
+ * A tela de Preços marca esses de forma diferente pra ninguém confundir o
+ * R$10 com um preço de verdade.
+ */
+export const INTERNAL_PLAN_KEYS = new Set(["test"]);
 export const CYCLE_LABELS: Record<string, string> = {
   semiannually: "Semestral",
   yearly: "Anual",

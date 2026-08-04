@@ -1,17 +1,9 @@
 import { useAffiliates, useCommissions, useMe } from "@/hooks/useBoCoupons";
-import { Card, CardContent } from "@/components/ui/card";
-import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
-import { CenteredSpinner } from "@/components/ui/spinner";
+import { PageHeader, Panel, Stat, StatGrid, Money } from "@/components/ds";
+import { DataTable, CellStack, type Column } from "@/components/ds/DataTable";
+import { CommissionStatusBadge } from "@/components/CouponBadges";
 import { formatCurrency, formatDate } from "@/lib/formatters";
-import type { Commission } from "@/types";
-
-const STATUS_META: Record<string, { label: string; cls: string }> = {
-  pending: { label: "Pendente", cls: "bg-muted text-muted-foreground" },
-  approved: { label: "Aprovada", cls: "bg-primary/15 text-primary" },
-  paid: { label: "Paga", cls: "bg-success/15 text-success" },
-  cancelled: { label: "Cancelada", cls: "bg-muted text-muted-foreground" },
-  reversed: { label: "Estornada", cls: "bg-destructive/15 text-destructive" },
-};
+import type { Affiliate, Commission } from "@/types";
 
 const sumCents = (rows: Commission[], pred: (c: Commission) => boolean) =>
   rows.filter(pred).reduce((a, c) => a + c.amount_cents, 0);
@@ -32,126 +24,96 @@ export function BusinessPanelPage() {
   const pending = sumCents(commissions, (c) => c.status === "pending" || c.status === "approved");
   const paid = sumCents(commissions, (c) => c.status === "paid");
 
-  return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold">
-          {isAffiliate ? "Minhas comissões" : "Minha carteira"}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {me?.scope_name ? `${me.scope_name} · ` : ""}
-          {isAffiliate
-            ? "Comissões geradas pelo seu cupom."
-            : "Afiliados e comissões da sua carteira."}
-        </p>
-      </div>
+  const colunasAfiliados: Column<Affiliate>[] = [
+    { header: "Afiliado", cell: (a) => <CellStack title={a.name} subtitle={a.email ?? undefined} /> },
+    {
+      header: "Comissão",
+      align: "right",
+      width: "8rem",
+      cell: (a) =>
+        a.default_commission_type === "fixed"
+          ? formatCurrency(a.default_commission_value / 100)
+          : `${a.default_commission_value}%`,
+    },
+    {
+      header: "Status",
+      width: "7rem",
+      cell: (a) => (a.status === "active" ? "Ativo" : "Suspenso"),
+    },
+  ];
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="A receber" value={formatCurrency(pending / 100)} hint="pendentes + aprovadas" />
-        <StatCard label="Já pago" value={formatCurrency(paid / 100)} hint="comissões pagas" />
-        <StatCard
+  const colunasComissoes: Column<Commission>[] = [
+    ...(isAffiliate
+      ? []
+      : [{ header: "Afiliado", cell: (c: Commission) => c.affiliate_name ?? "—" } as Column<Commission>]),
+    {
+      header: "Valor",
+      align: "right",
+      width: "8rem",
+      cell: (c) => <Money cents={c.amount_cents} className="font-medium text-strong" />,
+    },
+    { header: "Status", width: "8rem", cell: (c) => <CommissionStatusBadge status={c.status} /> },
+    {
+      header: "Elegível em",
+      width: "8rem",
+      hideBelow: "md",
+      cell: (c) => <span className="tabular text-subtle">{formatDate(c.eligible_at)}</span>,
+    },
+    {
+      header: "Pago em",
+      width: "8rem",
+      hideBelow: "md",
+      cell: (c) => <span className="tabular text-subtle">{formatDate(c.paid_at)}</span>,
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title={isAffiliate ? "Minhas comissões" : "Minha carteira"}
+        description={`${me?.scope_name ? `${me.scope_name} · ` : ""}${
+          isAffiliate ? "Comissões geradas pelo seu cupom." : "Afiliados e comissões da sua carteira."
+        }`}
+      />
+
+      <StatGrid cols={3}>
+        <Stat label="A receber" value={<Money cents={pending} />} hint="pendentes + aprovadas" tone="brand" />
+        <Stat label="Já pago" value={<Money cents={paid} />} hint="comissões pagas" tone="success" />
+        <Stat
           label={isAffiliate ? "Comissões" : "Afiliados"}
-          value={String(isAffiliate ? commissions.length : affData?.total ?? 0)}
+          value={isAffiliate ? commissions.length : affData?.total ?? 0}
           hint={isAffiliate ? "no total" : "na carteira"}
         />
-      </div>
+      </StatGrid>
 
       {!isAffiliate && (
-        <Card>
-          <CardContent className="pt-5">
-            <p className="mb-3 text-sm font-medium">Afiliados da carteira</p>
-            {affLoading ? (
-              <CenteredSpinner label="Carregando afiliados…" />
-            ) : !affData || affData.items.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                Nenhum afiliado na carteira ainda. O admin da TikTally cadastra os afiliados.
-              </p>
-            ) : (
-              <Table>
-                <THead>
-                  <TR className="hover:bg-transparent">
-                    <TH>Nome</TH>
-                    <TH>E-mail</TH>
-                    <TH className="text-right">Comissão</TH>
-                    <TH>Status</TH>
-                  </TR>
-                </THead>
-                <TBody>
-                  {affData.items.map((a) => (
-                    <TR key={a.id}>
-                      <TD className="font-medium">{a.name}</TD>
-                      <TD className="text-muted-foreground">{a.email ?? "—"}</TD>
-                      <TD className="text-right tabular-nums">
-                        {a.default_commission_type === "fixed"
-                          ? formatCurrency(a.default_commission_value / 100)
-                          : `${a.default_commission_value}%`}
-                      </TD>
-                      <TD className="text-muted-foreground">
-                        {a.status === "active" ? "Ativo" : "Suspenso"}
-                      </TD>
-                    </TR>
-                  ))}
-                </TBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        <Panel title="Afiliados da carteira">
+          <DataTable
+            rows={affData?.items}
+            rowKey={(a) => a.id}
+            loading={affLoading}
+            empty={{
+              title: "Nenhum afiliado na carteira",
+              description: "O admin da TikTally cadastra os afiliados vinculados a você.",
+            }}
+            columns={colunasAfiliados}
+          />
+        </Panel>
       )}
 
-      <Card>
-        <CardContent className="pt-5">
-          <p className="mb-3 text-sm font-medium">Comissões</p>
-          {comLoading ? (
-            <CenteredSpinner label="Carregando comissões…" />
-          ) : error ? (
-            <p className="py-6 text-center text-sm text-destructive">{(error as Error).message}</p>
-          ) : commissions.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              Nenhuma comissão ainda. Elas aparecem quando um cliente assina usando o cupom.
-            </p>
-          ) : (
-            <Table>
-              <THead>
-                <TR className="hover:bg-transparent">
-                  {!isAffiliate && <TH>Afiliado</TH>}
-                  <TH className="text-right">Valor</TH>
-                  <TH>Status</TH>
-                  <TH>Elegível em</TH>
-                  <TH>Pago em</TH>
-                </TR>
-              </THead>
-              <TBody>
-                {commissions.map((c) => {
-                  const meta = STATUS_META[c.status] ?? { label: c.status, cls: "bg-muted text-muted-foreground" };
-                  return (
-                    <TR key={c.id}>
-                      {!isAffiliate && <TD className="font-medium">{c.affiliate_name ?? "—"}</TD>}
-                      <TD className="text-right font-medium tabular-nums">{formatCurrency(c.amount_cents / 100)}</TD>
-                      <TD>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${meta.cls}`}>{meta.label}</span>
-                      </TD>
-                      <TD className="whitespace-nowrap text-muted-foreground">{formatDate(c.eligible_at)}</TD>
-                      <TD className="whitespace-nowrap text-muted-foreground">{formatDate(c.paid_at)}</TD>
-                    </TR>
-                  );
-                })}
-              </TBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <Panel title="Comissões">
+        <DataTable
+          rows={commissions}
+          rowKey={(c) => c.id}
+          loading={comLoading}
+          error={error ? (error as Error).message : null}
+          empty={{
+            title: "Nenhuma comissão ainda",
+            description: "Elas aparecem quando um cliente assina usando o cupom.",
+          }}
+          columns={colunasComissoes}
+        />
+      </Panel>
     </div>
-  );
-}
-
-function StatCard({ label, value, hint }: { label: string; value: string; hint: string }) {
-  return (
-    <Card>
-      <CardContent className="pt-5">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
-      </CardContent>
-    </Card>
   );
 }

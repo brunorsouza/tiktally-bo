@@ -7,6 +7,9 @@
  * derivar — não a boa vontade de quem escreve a próxima tela.
  */
 import type { ReactNode, HTMLAttributes } from "react";
+import { Link } from "react-router-dom";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /* ── Superfície ────────────────────────────────────────────────────────────
@@ -58,6 +61,51 @@ export function PageHeader({
   );
 }
 
+/* ── Volta ────────────────────────────────────────────────────────────────
+   Telas de detalhe tinham dois jeitos de voltar (link com seta e botão-ícone).
+   Um só, e discreto: navegação não disputa atenção com o conteúdo. */
+export function BackLink({ to, children }: { to: string; children: ReactNode }) {
+  return (
+    <Link
+      to={to}
+      className="inline-flex items-center gap-1.5 text-[0.75rem] text-subtle transition-colors duration-ds ease-ds hover:text-strong"
+    >
+      <ArrowLeft className="h-3.5 w-3.5" />
+      {children}
+    </Link>
+  );
+}
+
+/* ── Grade de dados ───────────────────────────────────────────────────────
+   Rótulo em cima, valor embaixo. Duas telas de detalhe tinham o mesmo
+   componente com nomes diferentes (`Info` e `Field`) — e `Field` colidia com
+   o campo de formulário. */
+export function InfoGrid({ cols = 4, children }: { cols?: 2 | 3 | 4; children: ReactNode }) {
+  const grid = { 2: "sm:grid-cols-2", 3: "sm:grid-cols-3", 4: "sm:grid-cols-2 lg:grid-cols-4" }[cols];
+  return <div className={cn("grid grid-cols-2 gap-x-5 gap-y-4", grid)}>{children}</div>;
+}
+
+export function Info({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <p className="t-overline">{label}</p>
+      <p className="mt-1 break-words text-[0.8125rem] text-strong">{value ?? "—"}</p>
+    </div>
+  );
+}
+
+/* ── Bloco de código / JSON ───────────────────────────────────────────────── */
+export function CodeBlock({ value, maxHeight = "20rem" }: { value: unknown; maxHeight?: string }) {
+  return (
+    <pre
+      style={{ maxHeight }}
+      className="overflow-auto rounded-md border border-line bg-surface-1 p-3 font-mono text-[0.6875rem] leading-relaxed text-subtle"
+    >
+      {typeof value === "string" ? value : JSON.stringify(value, null, 2)}
+    </pre>
+  );
+}
+
 /* ── Barra de filtros ─────────────────────────────────────────────────────
    Antes: um `<Card>` inteiro só pra segurar 3 filtros. Vira uma faixa. */
 export function Toolbar({ children, className }: { children: ReactNode; className?: string }) {
@@ -101,6 +149,71 @@ export function Stat({
   );
 }
 
+/* ── Grade de métricas ────────────────────────────────────────────────────
+   Métricas lado a lado separadas só pela régua do `Stat` — sem um cartão
+   por número. Era isso que fazia o dashboard parecer um mural de widgets. */
+export function StatGrid({ cols = 4, children }: { cols?: 3 | 4 | 5; children: ReactNode }) {
+  const grid = { 3: "sm:grid-cols-3", 4: "sm:grid-cols-2 lg:grid-cols-4", 5: "sm:grid-cols-3 lg:grid-cols-5" }[cols];
+  return <div className={cn("grid grid-cols-2 gap-y-5", grid)}>{children}</div>;
+}
+
+/* ── Painel com título ────────────────────────────────────────────────────
+   Substitui Card + CardHeader + CardTitle. O título é uma faixa, não outra
+   caixa aninhada. */
+export function Panel({
+  title,
+  actions,
+  children,
+  className,
+}: {
+  title: ReactNode;
+  actions?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={cn("min-w-0", className)}>
+      <div className="mb-3 flex items-center justify-between gap-3 border-b border-line pb-2">
+        <h2 className="t-label">{title}</h2>
+        {actions}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/* ── Controle segmentado ──────────────────────────────────────────────────
+   Seletor de período. Estava com marcação própria em 2 telas. */
+export function Segmented<T extends string | number>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div role="tablist" className="inline-flex rounded-md border border-line p-0.5">
+      {options.map((o) => (
+        <button
+          key={String(o.value)}
+          role="tab"
+          aria-selected={value === o.value}
+          onClick={() => onChange(o.value)}
+          className={cn(
+            "rounded-[0.3125rem] px-2.5 py-1 text-[0.6875rem] font-semibold uppercase tracking-wider",
+            "transition-colors duration-ds ease-ds",
+            value === o.value ? "bg-surface-3 text-strong" : "text-subtle hover:text-strong"
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /* ── Campo de formulário ──────────────────────────────────────────────────
    Estava definido 4 VEZES em arquivos diferentes (cada tela com o seu). */
 export function Field({
@@ -129,6 +242,90 @@ export function Field({
   );
 }
 
+/* ── Nota ─────────────────────────────────────────────────────────────────
+   As caixinhas de "como essa regra funciona" estavam com 4 marcações
+   diferentes. Régua na esquerda em vez de caixa: informa sem competir com o
+   formulário. */
+export function Note({
+  tone = "neutral",
+  children,
+  className,
+}: {
+  tone?: "neutral" | "brand" | "warning";
+  children: ReactNode;
+  className?: string;
+}) {
+  const linha = {
+    neutral: "border-line-strong",
+    brand: "border-brand",
+    warning: "border-warning",
+  }[tone];
+
+  return (
+    <div className={cn("border-l-2 pl-3 text-[0.75rem] leading-relaxed text-subtle", linha, className)}>
+      {children}
+    </div>
+  );
+}
+
+/* ── Caixa de marcar ──────────────────────────────────────────────────────
+   O checkbox nativo ignora o tema e sai cinza-sistema no escuro. Aqui o
+   input real fica invisível (mas presente: foco por teclado, leitor de tela)
+   e o quadrado visível é desenhado por CSS via `peer`. */
+export function Checkbox({
+  checked,
+  onChange,
+  label,
+  hint,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: ReactNode;
+  hint?: ReactNode;
+  disabled?: boolean;
+}) {
+  return (
+    <label
+      className={cn(
+        "flex select-none items-start gap-2.5",
+        disabled ? "cursor-not-allowed opacity-45" : "cursor-pointer"
+      )}
+    >
+      <span className="relative flex h-4 items-center">
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.checked)}
+          className="peer sr-only"
+        />
+        <span
+          aria-hidden
+          className={cn(
+            "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[2px] border border-line-strong bg-surface-1",
+            "transition-colors duration-ds ease-ds",
+            "peer-checked:border-brand peer-checked:bg-brand",
+            "peer-focus-visible:border-brand peer-focus-visible:ring-1 peer-focus-visible:ring-brand"
+          )}
+        >
+          <Check
+            className={cn(
+              "h-2.5 w-2.5 text-brand-foreground transition-opacity duration-ds ease-ds",
+              checked ? "opacity-100" : "opacity-0"
+            )}
+            strokeWidth={3.5}
+          />
+        </span>
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[0.8125rem] text-strong">{label}</span>
+        {hint && <span className="t-caption mt-0.5 block">{hint}</span>}
+      </span>
+    </label>
+  );
+}
+
 /* ── Chip selecionável ────────────────────────────────────────────────────
    Também estava duplicado em 2 telas. */
 export function Chip({
@@ -149,7 +346,7 @@ export function Chip({
       disabled={disabled}
       aria-pressed={active}
       className={cn(
-        "rounded-sm border px-2 py-1 font-mono text-[0.6875rem] uppercase tracking-wider transition-colors duration-ds ease-ds",
+        "rounded-md border px-2.5 py-1 text-[0.6875rem] font-semibold uppercase tracking-wider transition-colors duration-ds ease-ds",
         "disabled:pointer-events-none disabled:opacity-40",
         active
           ? "border-brand bg-brand-muted text-brand-strong"
@@ -178,7 +375,7 @@ export function Status({ tone = "neutral", children }: { tone?: Tone; children: 
 
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[0.75rem] font-medium text-[hsl(var(--text))]">
-      <span className={cn("h-1.5 w-1.5 shrink-0 rounded-[1px]", dot)} />
+      <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dot)} />
       {children}
     </span>
   );
@@ -241,6 +438,48 @@ export function TableSkeleton({ rows = 5, cols = 5 }: { rows?: number; cols?: nu
           ))}
         </div>
       ))}
+    </div>
+  );
+}
+
+/* ── Paginação ────────────────────────────────────────────────────────────
+   Contagem à esquerda, navegação à direita. A contagem vem primeiro porque
+   "quantos resultados" é a pergunta mais frequente — não "qual página". */
+export function Pagination({
+  page,
+  totalPages,
+  total,
+  unit,
+  fetching,
+  onPage,
+}: {
+  page: number;
+  totalPages: number;
+  total: number;
+  /** Palavra no plural: "resgates", "notas". */
+  unit: string;
+  fetching?: boolean;
+  onPage: (p: number) => void;
+}) {
+  const paginas = Math.max(1, totalPages);
+
+  return (
+    <div className="flex items-center justify-between border-t border-line pt-3">
+      <p className="t-caption">
+        <span className="tabular text-strong">{total}</span> {unit}
+        {fetching && <span className="ml-2 animate-pulse">atualizando…</span>}
+      </p>
+      <div className="flex items-center gap-1.5">
+        <Button size="icon-sm" variant="outline" disabled={page <= 1} onClick={() => onPage(Math.max(1, page - 1))}>
+          <ChevronLeft />
+        </Button>
+        <span className="t-caption tabular px-1">
+          {page} / {paginas}
+        </span>
+        <Button size="icon-sm" variant="outline" disabled={page >= paginas} onClick={() => onPage(page + 1)}>
+          <ChevronRight />
+        </Button>
+      </div>
     </div>
   );
 }

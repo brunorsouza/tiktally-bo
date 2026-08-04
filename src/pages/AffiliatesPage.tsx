@@ -131,6 +131,7 @@ export function AffiliatesPage() {
           />
         </form>
         <Select
+          selectSize="sm"
           className="w-40"
           value={status}
           onChange={(e) => setStatus(e.target.value as EntityStatus | "")}
@@ -232,12 +233,27 @@ function AffiliateDialog({ affiliate, onClose }: { affiliate: Affiliate | null; 
   };
 
   return (
-    <Dialog open onClose={onClose} title={isEdit ? `Editar ${affiliate?.name}` : "Novo afiliado"}>
+    <Dialog
+      open
+      onClose={onClose}
+      title={isEdit ? `Editar ${affiliate?.name}` : "Novo afiliado"}
+      description="Quem distribui cupons e recebe comissão sobre o valor pago."
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancelar
+          </Button>
+          <Button onClick={submit} loading={busy} disabled={!canSubmit}>
+            {isEdit ? "Salvar" : "Criar afiliado"}
+          </Button>
+        </>
+      }
+    >
       <div className="space-y-4">
         <Field label="Nome">
           <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus={!isEdit} placeholder="Nome do afiliado" />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <Field label="E-mail">
             <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="afiliado@email.com" />
           </Field>
@@ -257,11 +273,13 @@ function AffiliateDialog({ affiliate, onClose }: { affiliate: Affiliate | null; 
         <Field label="Chave PIX (recebimento de comissão)">
           <Input value={pixKey} onChange={(e) => setPixKey(e.target.value)} placeholder="e-mail, CPF, telefone ou aleatória" />
         </Field>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-4">
           <Field label="Tipo de comissão">
+            {/* Sem a unidade no rótulo: ela já aparece no campo "Valor" ao lado,
+                e o texto longo cortava sob a seta na coluna estreita */}
             <Select value={commType} onChange={(e) => setCommType(e.target.value as CommissionType)}>
-              <option value="percent">Percentual (%)</option>
-              <option value="fixed">Fixa (R$)</option>
+              <option value="percent">Percentual</option>
+              <option value="fixed">Fixa</option>
             </Select>
           </Field>
           <Field label={`Valor (${commType === "fixed" ? "R$" : "%"})`}>
@@ -280,14 +298,6 @@ function AffiliateDialog({ affiliate, onClose }: { affiliate: Affiliate | null; 
               <option value="suspended">Suspenso</option>
             </Select>
           </Field>
-        </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={onClose} disabled={busy}>
-            Cancelar
-          </Button>
-          <Button onClick={submit} loading={busy} disabled={!canSubmit}>
-            {isEdit ? "Salvar" : "Criar afiliado"}
-          </Button>
         </div>
       </div>
     </Dialog>
@@ -325,7 +335,22 @@ function AffiliateAccessDialog({ affiliate, onClose }: { affiliate: Affiliate; o
   };
 
   return (
-    <Dialog open onClose={onClose} title={`Dar acesso — ${affiliate.name}`}>
+    <Dialog
+      open
+      onClose={onClose}
+      title={`Dar acesso — ${affiliate.name}`}
+      description="Login no backoffice para acompanhar o próprio desempenho."
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancelar
+          </Button>
+          <Button onClick={submit} loading={busy} disabled={!valid}>
+            {mode === "link" ? "Vincular conta" : "Criar acesso"}
+          </Button>
+        </>
+      }
+    >
       <div className="space-y-4">
         <div className="flex gap-2">
           <Chip active={mode === "link"} onClick={() => setMode("link")}>
@@ -367,14 +392,6 @@ function AffiliateAccessDialog({ affiliate, onClose }: { affiliate: Affiliate; o
           própria chave PIX. Vincular também <strong>impede</strong> que ele use o próprio cupom.
         </p>
 
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={onClose} disabled={busy}>
-            Cancelar
-          </Button>
-          <Button onClick={submit} loading={busy} disabled={!valid}>
-            {mode === "link" ? "Vincular conta" : "Criar acesso"}
-          </Button>
-        </div>
       </div>
     </Dialog>
   );

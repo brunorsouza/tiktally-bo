@@ -1,10 +1,8 @@
 import { useNavigate } from "react-router-dom";
-import { FlaskConical, CheckCircle2, AlertTriangle } from "lucide-react";
+import { FlaskConical, AlertTriangle, Store } from "lucide-react";
 import { useSellers } from "@/hooks/useBoFiscal";
-import { Card, CardContent } from "@/components/ui/card";
-import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { CenteredSpinner } from "@/components/ui/spinner";
+import { PageHeader, Status } from "@/components/ds";
+import { DataTable, CellStack, type Column } from "@/components/ds/DataTable";
 import { formatCnpj, formatDate } from "@/lib/formatters";
 
 const REGIME_LABEL: Record<string, string> = {
@@ -13,103 +11,88 @@ const REGIME_LABEL: Record<string, string> = {
   lucro_real: "Lucro Real",
 };
 
+/** Certificado a menos de 30 dias do vencimento merece aviso, não só a data. */
+const VENCE_EM_BREVE_MS = 30 * 864e5;
+
 export function SellersPage() {
   const navigate = useNavigate();
   const { data, isLoading, error } = useSellers();
 
+  type Seller = NonNullable<typeof data>[number];
+
+  const colunas: Column<Seller>[] = [
+    {
+      header: "Seller",
+      cell: (s) => (
+        <div className="flex items-center gap-1.5">
+          <CellStack title={s.shop_name || s.nome_fantasia || "—"} subtitle={s.email} />
+          {s.spedy_use_sandbox && <FlaskConical className="h-3 w-3 shrink-0 text-warning" aria-label="sandbox" />}
+        </div>
+      ),
+    },
+    {
+      header: "CNPJ",
+      width: "10rem",
+      hideBelow: "md",
+      cell: (s) => <span className="tabular text-subtle">{formatCnpj(s.cnpj)}</span>,
+    },
+    {
+      header: "Regime",
+      width: "10rem",
+      hideBelow: "lg",
+      cell: (s) => REGIME_LABEL[s.regime_tributario ?? ""] || s.regime_tributario || "—",
+    },
+    {
+      header: "Spedy",
+      width: "7rem",
+      cell: (s) =>
+        s.spedy_active ? <Status tone="success">ativo</Status> : <Status tone="neutral">inativo</Status>,
+    },
+    {
+      header: "Certificado",
+      width: "9rem",
+      hideBelow: "md",
+      cell: (s) => {
+        if (!s.certificate_expires_at) return <span className="text-subtle">—</span>;
+        const vencendo = new Date(s.certificate_expires_at).getTime() - Date.now() < VENCE_EM_BREVE_MS;
+        return (
+          <span className={vencendo ? "flex items-center gap-1 text-warning" : "tabular text-subtle"}>
+            {vencendo && <AlertTriangle className="h-3 w-3 shrink-0" />}
+            <span className="tabular">{formatDate(s.certificate_expires_at)}</span>
+          </span>
+        );
+      },
+    },
+    { header: "Notas", align: "right", width: "5.5rem", cell: (s) => s.counts.total },
+    {
+      header: "Rejeit.",
+      align: "right",
+      width: "5.5rem",
+      cell: (s) => (s.counts.rejected > 0 ? <span className="text-danger">{s.counts.rejected}</span> : 0),
+    },
+  ];
+
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold">Sellers com config fiscal</h1>
-        <p className="text-sm text-muted-foreground">
-          Empresas cadastradas na Spedy, regime, certificado e volume de notas.
-        </p>
-      </div>
+      <PageHeader
+        title="Sellers com config fiscal"
+        description="Empresas cadastradas na Spedy, regime, certificado e volume de notas."
+        meta={data && <span className="t-overline">{data.length}</span>}
+      />
 
-      <Card>
-        <CardContent className="pt-5">
-          {isLoading ? (
-            <CenteredSpinner label="Carregando sellers…" />
-          ) : error ? (
-            <p className="py-8 text-center text-sm text-destructive">{(error as Error).message}</p>
-          ) : !data || data.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              Nenhum seller com config fiscal ainda.
-            </p>
-          ) : (
-            <Table>
-              <THead>
-                <TR className="hover:bg-transparent">
-                  <TH>Seller</TH>
-                  <TH>CNPJ</TH>
-                  <TH>Regime</TH>
-                  <TH>Spedy</TH>
-                  <TH>Certificado</TH>
-                  <TH className="text-right">Notas</TH>
-                  <TH className="text-right">Rejeit.</TH>
-                </TR>
-              </THead>
-              <TBody>
-                {data.map((s) => {
-                  const certExpiring =
-                    s.certificate_expires_at &&
-                    new Date(s.certificate_expires_at).getTime() - Date.now() < 30 * 864e5;
-                  return (
-                    <TR
-                      key={s.user_id}
-                      className="cursor-pointer"
-                      onClick={() =>
-                        navigate(`/invoices?user=${s.user_id}`)
-                      }
-                    >
-                      <TD>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-medium">{s.shop_name || s.nome_fantasia || "—"}</span>
-                          {s.spedy_use_sandbox && (
-                            <FlaskConical className="h-3.5 w-3.5 text-warning" aria-label="sandbox" />
-                          )}
-                        </div>
-                        <span className="text-xs text-muted-foreground">{s.email}</span>
-                      </TD>
-                      <TD className="text-muted-foreground">{formatCnpj(s.cnpj)}</TD>
-                      <TD>{REGIME_LABEL[s.regime_tributario ?? ""] || s.regime_tributario || "—"}</TD>
-                      <TD>
-                        {s.spedy_active ? (
-                          <Badge tone="success" className="gap-1">
-                            <CheckCircle2 className="h-3 w-3" /> ativo
-                          </Badge>
-                        ) : (
-                          <Badge tone="muted">inativo</Badge>
-                        )}
-                      </TD>
-                      <TD>
-                        {s.certificate_expires_at ? (
-                          <span
-                            className={certExpiring ? "flex items-center gap-1 text-warning" : ""}
-                          >
-                            {certExpiring && <AlertTriangle className="h-3.5 w-3.5" />}
-                            {formatDate(s.certificate_expires_at)}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TD>
-                      <TD className="text-right tabular-nums">{s.counts.total}</TD>
-                      <TD className="text-right tabular-nums">
-                        {s.counts.rejected > 0 ? (
-                          <span className="text-destructive">{s.counts.rejected}</span>
-                        ) : (
-                          0
-                        )}
-                      </TD>
-                    </TR>
-                  );
-                })}
-              </TBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <DataTable
+        rows={data}
+        rowKey={(s) => s.user_id}
+        loading={isLoading}
+        error={error ? (error as Error).message : null}
+        onRowClick={(s) => navigate(`/invoices?user=${s.user_id}`)}
+        empty={{
+          title: "Nenhum seller com config fiscal",
+          description: "Sellers aparecem aqui depois de configurar a emissão na Spedy.",
+          icon: <Store />,
+        }}
+        columns={colunas}
+      />
     </div>
   );
 }

@@ -1,94 +1,79 @@
 import { Webhook as WebhookIcon, Power, PowerOff } from "lucide-react";
 import { useWebhooks, useWebhookToggle } from "@/hooks/useBoFiscal";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { CenteredSpinner } from "@/components/ui/spinner";
+import { PageHeader, Status } from "@/components/ds";
+import { DataTable, RowActions, type Column } from "@/components/ds/DataTable";
 
 export function WebhooksPage() {
   const { data, isLoading, error } = useWebhooks();
   const toggle = useWebhookToggle();
 
+  type Hook = NonNullable<typeof data>[number];
+  const habilitado = (w: Hook) => w.enabled ?? w.isActive ?? true;
+
+  const colunas: Column<Hook>[] = [
+    { header: "Evento", width: "14rem", cell: (w) => <span className="font-mono text-strong">{w.event}</span> },
+    {
+      header: "URL",
+      cell: (w) => (
+        <span className="block truncate font-mono text-[0.6875rem] text-subtle" title={w.url}>
+          {w.url}
+        </span>
+      ),
+    },
+    {
+      header: "Status",
+      width: "9rem",
+      cell: (w) =>
+        habilitado(w) ? <Status tone="success">habilitado</Status> : <Status tone="danger">desabilitado</Status>,
+    },
+    {
+      header: "",
+      align: "right",
+      width: "9rem",
+      cell: (w) => (
+        <RowActions>
+          <Button
+            size="sm"
+            variant={habilitado(w) ? "outline" : "success"}
+            loading={toggle.isPending && toggle.variables?.id === w.id}
+            onClick={() => toggle.mutate({ id: w.id, enabled: !habilitado(w) })}
+          >
+            {habilitado(w) ? (
+              <>
+                <PowerOff /> Desabilitar
+              </>
+            ) : (
+              <>
+                <Power /> Habilitar
+              </>
+            )}
+          </Button>
+        </RowActions>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold">Webhooks Spedy</h1>
-        <p className="text-sm text-muted-foreground">
-          Webhooks da conta Spedy (escopo: conta, não empresa). Reabilite os que a Spedy desligou
-          após 5 falhas de entrega.
-        </p>
-      </div>
+      <PageHeader
+        title="Webhooks Spedy"
+        description="Webhooks da conta Spedy (escopo: conta, não empresa). Reabilite os que a Spedy desligou após 5 falhas de entrega."
+        meta={data && <span className="t-overline">{data.length}</span>}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <WebhookIcon className="h-4 w-4" /> Registros
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <CenteredSpinner label="Carregando webhooks…" />
-          ) : error ? (
-            <p className="py-8 text-center text-sm text-destructive">{(error as Error).message}</p>
-          ) : !data || data.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              Nenhum webhook cadastrado na Spedy.
-            </p>
-          ) : (
-            <Table>
-              <THead>
-                <TR className="hover:bg-transparent">
-                  <TH>Evento</TH>
-                  <TH>URL</TH>
-                  <TH>Status</TH>
-                  <TH className="text-right">Ação</TH>
-                </TR>
-              </THead>
-              <TBody>
-                {data.map((w) => {
-                  const enabled = w.enabled ?? w.isActive ?? true;
-                  return (
-                    <TR key={w.id}>
-                      <TD>
-                        <Badge tone="info">{w.event}</Badge>
-                      </TD>
-                      <TD className="max-w-[320px] truncate text-muted-foreground" title={w.url}>
-                        {w.url}
-                      </TD>
-                      <TD>
-                        {enabled ? (
-                          <Badge tone="success">habilitado</Badge>
-                        ) : (
-                          <Badge tone="destructive">desabilitado</Badge>
-                        )}
-                      </TD>
-                      <TD className="text-right">
-                        <Button
-                          size="sm"
-                          variant={enabled ? "outline" : "success"}
-                          loading={toggle.isPending && toggle.variables?.id === w.id}
-                          onClick={() => toggle.mutate({ id: w.id, enabled: !enabled })}
-                        >
-                          {enabled ? (
-                            <>
-                              <PowerOff className="h-4 w-4" /> Desabilitar
-                            </>
-                          ) : (
-                            <>
-                              <Power className="h-4 w-4" /> Habilitar
-                            </>
-                          )}
-                        </Button>
-                      </TD>
-                    </TR>
-                  );
-                })}
-              </TBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <DataTable
+        rows={data}
+        rowKey={(w) => String(w.id)}
+        loading={isLoading}
+        error={error ? (error as Error).message : null}
+        empty={{
+          title: "Nenhum webhook cadastrado",
+          description: "Cadastre os webhooks no painel da Spedy para receber os eventos de NF-e.",
+          icon: <WebhookIcon />,
+        }}
+        columns={colunas}
+      />
     </div>
   );
 }

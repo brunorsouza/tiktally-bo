@@ -1,12 +1,18 @@
 import { useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
-import { Receipt, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { CenteredSpinner } from "@/components/ui/spinner";
+import { Field, Note, Skeleton } from "@/components/ds";
 
+/**
+ * Login.
+ *
+ * Sem o cartão centralizado de sempre: o formulário se alinha à esquerda numa
+ * coluna estreita, com a mesma régua e o mesmo monograma da barra lateral.
+ * Quem entra já reconhece o produto antes de digitar.
+ */
 export function LoginPage() {
   const { session, loading, signIn } = useAuth();
   const [email, setEmail] = useState("");
@@ -15,7 +21,12 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  if (loading) return <CenteredSpinner />;
+  if (loading)
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <Skeleton className="h-40 w-full max-w-[20rem]" />
+      </div>
+    );
   if (session) return <Navigate to="/" replace />;
 
   const onSubmit = async (e: FormEvent) => {
@@ -32,57 +43,68 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
-        <CardContent className="pt-6">
-          <div className="mb-6 flex flex-col items-center gap-2 text-center">
-            <Receipt className="h-8 w-8 text-primary" />
-            <h1 className="text-lg font-semibold">TikTally Backoffice</h1>
-            <p className="text-sm text-muted-foreground">Equipe TikTally e parceiros</p>
+    <div className="flex min-h-screen items-center justify-center bg-base p-6">
+      <div className="w-full max-w-[20rem]">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-brand text-[0.8125rem] font-bold text-brand-foreground">
+            T
           </div>
+          <div className="leading-tight">
+            <p className="text-[0.875rem] font-semibold tracking-tight text-strong">TikTally</p>
+            <p className="text-[0.5625rem] font-semibold uppercase tracking-[0.12em] text-subtle">Backoffice</p>
+          </div>
+        </div>
 
-          <form onSubmit={onSubmit} className="space-y-3">
-            <div className="space-y-1">
-              <label className="text-sm font-medium">E-mail</label>
+        <div className="my-6 border-t border-line" />
+
+        <form onSubmit={onSubmit} className="space-y-4">
+          <Field label="E-mail">
+            <Input
+              type="email"
+              autoComplete="email"
+              autoFocus
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="voce@tiktally.com.br"
+              required
+            />
+          </Field>
+
+          <Field label="Senha">
+            <div className="relative">
               <Input
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 required
+                className="pr-10"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((s) => !s)}
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-subtle transition-colors duration-ds ease-ds hover:text-strong"
+                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              </button>
             </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Senha</label>
-              <div className="relative">
-                <Input
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((s) => !s)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground transition hover:text-foreground"
-                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
+          </Field>
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && (
+            <Note tone="warning" className="border-l-danger text-danger">
+              {error}
+            </Note>
+          )}
 
-            <Button type="submit" className="w-full" loading={submitting}>
-              Entrar
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+          <Button type="submit" className="w-full" loading={submitting}>
+            Entrar
+          </Button>
+        </form>
+
+        <p className="t-caption mt-6">Acesso da equipe TikTally, parceiros e afiliados.</p>
+      </div>
     </div>
   );
 }

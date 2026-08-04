@@ -23,18 +23,24 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   block?: boolean;
 }
 
+/**
+ * Toda variante tem borda — inclusive as preenchidas, com um fio mais claro
+ * que o fundo (a "luz de topo" que dá volume no escuro). O `ghost` usa borda
+ * transparente e só a acende no hover: ganha contorno sem empurrar o layout.
+ */
 const base =
-  "bg-brand text-brand-foreground shadow-1 hover:bg-brand-strong active:bg-brand active:translate-y-px";
+  "border border-brand-strong bg-brand text-brand-foreground shadow-1 " +
+  "hover:bg-brand-strong active:bg-brand active:translate-y-px";
 
 const variants: Record<Variant, string> = {
   primary: base,
   default: base, // alias legado
-  outline: "border border-line-strong bg-transparent text-strong hover:bg-surface-3 active:translate-y-px",
-  ghost: "bg-transparent text-subtle hover:bg-surface-3 hover:text-strong active:translate-y-px",
-  subtle: "bg-surface-3 text-strong hover:bg-line active:translate-y-px",
-  danger: "bg-danger text-white shadow-1 hover:brightness-110 active:translate-y-px",
-  destructive: "bg-danger text-white shadow-1 hover:brightness-110 active:translate-y-px", // alias legado
-  success: "bg-success text-success-foreground shadow-1 hover:brightness-110 active:translate-y-px",
+  outline: "border border-line-strong bg-surface-1 text-strong hover:border-subtle hover:bg-surface-3 active:translate-y-px",
+  ghost: "border border-transparent bg-transparent text-subtle hover:border-line hover:bg-surface-3 hover:text-strong active:translate-y-px",
+  subtle: "border border-line-strong bg-surface-3 text-strong hover:bg-line active:translate-y-px",
+  danger: "border border-white/20 bg-danger text-white shadow-1 hover:brightness-110 active:translate-y-px",
+  destructive: "border border-white/20 bg-danger text-white shadow-1 hover:brightness-110 active:translate-y-px", // alias legado
+  success: "border border-white/20 bg-success text-success-foreground shadow-1 hover:brightness-110 active:translate-y-px",
 };
 
 const sizes: Record<Size, string> = {

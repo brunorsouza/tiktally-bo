@@ -1,14 +1,13 @@
 import { useState } from "react";
-import { Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { Download, Gift } from "lucide-react";
 import { useRedemptions } from "@/hooks/useBoCoupons";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { CenteredSpinner } from "@/components/ui/spinner";
+import { PageHeader, Toolbar, Status, Money, Pagination } from "@/components/ds";
+import { DataTable, type Column } from "@/components/ds/DataTable";
 import { useToast } from "@/components/ui/toast";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
+import { formatDateTime } from "@/lib/formatters";
+import type { CouponRedemption } from "@/types";
 
 const TYPE_FILTERS = [
   { value: "", label: "Todos os tipos" },
@@ -64,110 +63,106 @@ export function RedemptionsPage() {
     toast.success("CSV exportado", `${items.length} linha(s)`);
   };
 
+  const colunas: Column<CouponRedemption>[] = [
+    {
+      header: "Data",
+      width: "11rem",
+      cell: (r) => <span className="tabular text-subtle">{formatDateTime(r.redeemed_at)}</span>,
+    },
+    { header: "Cupom", width: "9rem", cell: (r) => <span className="font-mono text-strong">{r.coupon_code ?? "—"}</span> },
+    {
+      header: "Tipo",
+      width: "7rem",
+      cell: (r) => (r.billing_id ? <Status tone="info">Compra</Status> : <Status tone="neutral">Trial</Status>),
+    },
+    { header: "Usuário", cell: (r) => <span className="text-subtle">{r.user_email ?? r.user_id}</span> },
+    {
+      header: "Desconto",
+      align: "right",
+      width: "8rem",
+      cell: (r) =>
+        r.discount_cents > 0 ? <Money cents={r.discount_cents} tone="success" /> : <span className="text-subtle">—</span>,
+    },
+  ];
+
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold">Resgates</h1>
-        <p className="text-sm text-muted-foreground">
-          Histórico de uso dos cupons — descontos em compras e trials concedidos.
-        </p>
+      <PageHeader
+        title="Resgates"
+        description="Histórico de uso dos cupons — descontos em compras e trials concedidos."
+        actions={
+          <Button variant="outline" onClick={exportCsv}>
+            <Download /> Exportar CSV
+          </Button>
+        }
+      />
+
+      <Toolbar>
+        <Input
+          inputSize="sm"
+          type="date"
+          aria-label="Data inicial"
+          value={from}
+          onChange={(e) => {
+            setFrom(e.target.value);
+            setPage(1);
+          }}
+          className="w-40"
+        />
+        <span className="t-caption">até</span>
+        <Input
+          inputSize="sm"
+          type="date"
+          aria-label="Data final"
+          value={to}
+          onChange={(e) => {
+            setTo(e.target.value);
+            setPage(1);
+          }}
+          className="w-40"
+        />
+        <Select
+          selectSize="sm"
+          className="w-52"
+          value={type}
+          onChange={(e) => {
+            setType(e.target.value);
+            setPage(1);
+          }}
+        >
+          {TYPE_FILTERS.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </Select>
+      </Toolbar>
+
+      <div className="space-y-3">
+        <DataTable
+          rows={data?.items}
+          rowKey={(r) => r.id}
+          loading={isLoading}
+          error={error ? (error as Error).message : null}
+          empty={{
+            title: "Nenhum resgate",
+            description: "Assim que um cupom for usado no checkout, o registro aparece aqui.",
+            icon: <Gift />,
+          }}
+          columns={colunas}
+        />
+
+        {data && data.items.length > 0 && (
+          <Pagination
+            page={page}
+            totalPages={data.totalPages}
+            total={data.total}
+            unit="resgates"
+            fetching={isFetching}
+            onPage={setPage}
+          />
+        )}
       </div>
-
-      <Card>
-        <CardContent className="flex flex-wrap items-end gap-3 pt-5">
-          <label className="text-xs text-muted-foreground">
-            De
-            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="mt-1 w-40" />
-          </label>
-          <label className="text-xs text-muted-foreground">
-            Até
-            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="mt-1 w-40" />
-          </label>
-          <Select
-            className="w-52"
-            value={type}
-            onChange={(e) => {
-              setType(e.target.value);
-              setPage(1);
-            }}
-          >
-            {TYPE_FILTERS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </Select>
-          <div className="ml-auto">
-            <Button variant="outline" onClick={exportCsv}>
-              <Download className="h-4 w-4" /> Exportar CSV
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="pt-5">
-          {isLoading ? (
-            <CenteredSpinner label="Carregando resgates…" />
-          ) : error ? (
-            <p className="py-8 text-center text-sm text-destructive">{(error as Error).message}</p>
-          ) : !data || data.items.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Nenhum resgate encontrado.</p>
-          ) : (
-            <>
-              <Table>
-                <THead>
-                  <TR className="hover:bg-transparent">
-                    <TH>Data</TH>
-                    <TH>Cupom</TH>
-                    <TH>Tipo</TH>
-                    <TH>Usuário</TH>
-                    <TH className="text-right">Desconto</TH>
-                  </TR>
-                </THead>
-                <TBody>
-                  {data.items.map((r) => (
-                    <TR key={r.id} className="hover:bg-transparent">
-                      <TD className="whitespace-nowrap text-muted-foreground">{formatDateTime(r.redeemed_at)}</TD>
-                      <TD className="font-mono">{r.coupon_code ?? "—"}</TD>
-                      <TD>
-                        {r.billing_id ? <Badge tone="info">Compra</Badge> : <Badge tone="default">Trial</Badge>}
-                      </TD>
-                      <TD className="text-xs">{r.user_email ?? r.user_id}</TD>
-                      <TD className="text-right tabular-nums">
-                        {r.discount_cents > 0 ? formatCurrency(r.discount_cents / 100) : "—"}
-                      </TD>
-                    </TR>
-                  ))}
-                </TBody>
-              </Table>
-
-              <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-                <span>
-                  {data.total} resgate(s){" "}
-                  {isFetching && <Badge tone="muted" className="ml-1">atualizando…</Badge>}
-                </span>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <span>
-                    {page} / {data.totalPages || 1}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={page >= (data.totalPages || 1)}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

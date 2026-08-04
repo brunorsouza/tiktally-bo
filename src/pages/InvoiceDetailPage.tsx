@@ -1,38 +1,35 @@
-import { useParams, Link } from "react-router-dom";
-import {
-  ArrowLeft,
-  RefreshCw,
-  RotateCw,
-  Mail,
-  FileDown,
-  FileCode,
-  FlaskConical,
-} from "lucide-react";
+import { useParams } from "react-router-dom";
+import { RefreshCw, RotateCw, Mail, FileDown, FileCode } from "lucide-react";
 import { useInvoice, useInvoiceActions } from "@/hooks/useBoFiscal";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import {
+  BackLink,
+  Panel,
+  Surface,
+  InfoGrid,
+  Info,
+  Note,
+  Status,
+  CodeBlock,
+  ErrorState,
+  Skeleton,
+} from "@/components/ds";
 import { StatusBadge } from "@/components/StatusBadge";
-import { CenteredSpinner } from "@/components/ui/spinner";
 import { formatCurrency, formatDateTime, formatCnpj } from "@/lib/formatters";
-
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="space-y-0.5">
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="break-words text-sm">{value ?? "—"}</p>
-    </div>
-  );
-}
 
 export function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading, error } = useInvoice(id);
   const actions = useInvoiceActions(id ?? "");
 
-  if (isLoading) return <CenteredSpinner label="Carregando nota…" />;
-  if (error)
-    return <p className="text-sm text-destructive">Erro: {(error as Error).message}</p>;
+  if (isLoading)
+    return (
+      <div className="space-y-5">
+        <Skeleton className="h-8 w-56" />
+        <Skeleton className="h-40" />
+      </div>
+    );
+  if (error) return <ErrorState message={(error as Error).message} />;
   if (!data) return null;
 
   const { invoice: inv, seller } = data;
@@ -41,39 +38,28 @@ export function InvoiceDetailPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Link to="/invoices">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold">
-                NF-e {inv.nfe_number ? `nº ${inv.nfe_number}` : "(sem número)"}
-              </h1>
-              <StatusBadge status={inv.status} />
-              {inv.sandbox && (
-                <Badge tone="warning" className="gap-1">
-                  <FlaskConical className="h-3 w-3" /> sandbox
-                </Badge>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {seller?.shop_name || inv.emitter_name} · pedido {inv.order_id}
-            </p>
+      <BackLink to="/invoices">Notas</BackLink>
+
+      <header className="flex flex-wrap items-end justify-between gap-3 border-b border-line pb-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-baseline gap-3">
+            <h1 className="t-display">NF-e {inv.nfe_number ? `nº ${inv.nfe_number}` : "(sem número)"}</h1>
+            <StatusBadge status={inv.status} />
+            {inv.sandbox && <Status tone="warning">sandbox</Status>}
           </div>
+          <p className="t-caption mt-1">
+            {seller?.shop_name || inv.emitter_name} · pedido <span className="font-mono">{inv.order_id}</span>
+          </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           <Button
             variant="outline"
             size="sm"
             loading={actions.checkStatus.isPending}
             onClick={() => actions.checkStatus.mutate()}
           >
-            <RefreshCw className="h-4 w-4" /> Verificar status
+            <RefreshCw /> Verificar status
           </Button>
           {isRejected && (
             <Button
@@ -82,7 +68,7 @@ export function InvoiceDetailPage() {
               loading={actions.reprocess.isPending}
               onClick={() => actions.reprocess.mutate()}
             >
-              <RotateCw className="h-4 w-4" /> Reprocessar
+              <RotateCw /> Reprocessar
             </Button>
           )}
           {isAuthorized && (
@@ -93,7 +79,7 @@ export function InvoiceDetailPage() {
                 loading={actions.openDocument.isPending && actions.openDocument.variables === "pdf"}
                 onClick={() => actions.openDocument.mutate("pdf")}
               >
-                <FileDown className="h-4 w-4" /> DANFE
+                <FileDown /> DANFE
               </Button>
               <Button
                 variant="outline"
@@ -101,7 +87,7 @@ export function InvoiceDetailPage() {
                 loading={actions.openDocument.isPending && actions.openDocument.variables === "xml"}
                 onClick={() => actions.openDocument.mutate("xml")}
               >
-                <FileCode className="h-4 w-4" /> XML
+                <FileCode /> XML
               </Button>
               <Button
                 variant="outline"
@@ -109,79 +95,66 @@ export function InvoiceDetailPage() {
                 loading={actions.resendEmail.isPending}
                 onClick={() => actions.resendEmail.mutate()}
               >
-                <Mail className="h-4 w-4" /> Reenviar e-mail
+                <Mail /> Reenviar e-mail
               </Button>
             </>
           )}
         </div>
-      </div>
+      </header>
 
       {isRejected && inv.error_message && (
-        <Card className="border-destructive/40 bg-destructive/5">
-          <CardContent className="pt-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-destructive">
-              Motivo da rejeição
-            </p>
-            <p className="mt-1 text-sm">{inv.error_message}</p>
-          </CardContent>
-        </Card>
+        <Note tone="warning" className="border-l-danger">
+          <p className="t-overline text-danger">Motivo da rejeição</p>
+          <p className="mt-1 text-[0.8125rem] text-strong">{inv.error_message}</p>
+        </Note>
       )}
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Nota</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <Field label="Tipo" value={inv.invoice_type?.toUpperCase()} />
-            <Field label="Valor total" value={formatCurrency(inv.total_amount)} />
-            <Field label="Nº / Série" value={inv.nfe_number ? `${inv.nfe_number}/${inv.nfe_series ?? "1"}` : "—"} />
-            <Field label="Chave de acesso" value={inv.nfe_key || "—"} />
-            <Field label="ICMS" value={formatCurrency(inv.tax_icms)} />
-            <Field label="PIS / COFINS" value={`${formatCurrency(inv.tax_pis)} / ${formatCurrency(inv.tax_cofins)}`} />
-            <Field label="Emitida em" value={formatDateTime(inv.issued_at)} />
-            <Field label="Criada em" value={formatDateTime(inv.created_at)} />
-          </CardContent>
-        </Card>
+        <Surface className="p-4">
+          <p className="t-label mb-4">Nota</p>
+          <InfoGrid cols={2}>
+            <Info label="Tipo" value={inv.invoice_type?.toUpperCase()} />
+            <Info label="Valor total" value={formatCurrency(inv.total_amount)} />
+            <Info label="Nº / Série" value={inv.nfe_number ? `${inv.nfe_number}/${inv.nfe_series ?? "1"}` : "—"} />
+            <Info label="Chave de acesso" value={<span className="font-mono">{inv.nfe_key || "—"}</span>} />
+            <Info label="ICMS" value={formatCurrency(inv.tax_icms)} />
+            <Info
+              label="PIS / COFINS"
+              value={`${formatCurrency(inv.tax_pis)} / ${formatCurrency(inv.tax_cofins)}`}
+            />
+            <Info label="Emitida em" value={formatDateTime(inv.issued_at)} />
+            <Info label="Criada em" value={formatDateTime(inv.created_at)} />
+          </InfoGrid>
+        </Surface>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Emitente & comprador</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <Field label="Seller" value={seller?.shop_name || "—"} />
-            <Field label="E-mail do seller" value={seller?.email || "—"} />
-            <Field label="Razão social" value={seller?.razao_social || inv.emitter_name} />
-            <Field label="CNPJ emitente" value={formatCnpj(inv.emitter_cnpj)} />
-            <Field label="Comprador" value={inv.buyer_name} />
-            <Field label="CPF/CNPJ comprador" value={formatCnpj(inv.buyer_cpf_cnpj)} />
-            <Field label="Regime" value={seller?.regime_tributario || "—"} />
-            <Field label="Spedy invoice ID" value={inv.spedy_invoice_id || inv.spedy_order_id || "—"} />
-          </CardContent>
-        </Card>
+        <Surface className="p-4">
+          <p className="t-label mb-4">Emitente & comprador</p>
+          <InfoGrid cols={2}>
+            <Info label="Seller" value={seller?.shop_name || "—"} />
+            <Info label="E-mail do seller" value={seller?.email || "—"} />
+            <Info label="Razão social" value={seller?.razao_social || inv.emitter_name} />
+            <Info label="CNPJ emitente" value={<span className="font-mono">{formatCnpj(inv.emitter_cnpj)}</span>} />
+            <Info label="Comprador" value={inv.buyer_name} />
+            <Info
+              label="CPF/CNPJ comprador"
+              value={<span className="font-mono">{formatCnpj(inv.buyer_cpf_cnpj)}</span>}
+            />
+            <Info label="Regime" value={seller?.regime_tributario || "—"} />
+            <Info
+              label="Spedy invoice ID"
+              value={<span className="font-mono">{inv.spedy_invoice_id || inv.spedy_order_id || "—"}</span>}
+            />
+          </InfoGrid>
+        </Surface>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Itens</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <pre className="max-h-64 overflow-auto rounded-md bg-muted p-3 text-xs">
-            {JSON.stringify(inv.items, null, 2)}
-          </pre>
-        </CardContent>
-      </Card>
+      <Panel title="Itens">
+        <CodeBlock value={inv.items} maxHeight="16rem" />
+      </Panel>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Resposta bruta da Spedy</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <pre className="max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">
-            {JSON.stringify(inv.spedy_response, null, 2)}
-          </pre>
-        </CardContent>
-      </Card>
+      <Panel title="Resposta bruta da Spedy">
+        <CodeBlock value={inv.spedy_response} />
+      </Panel>
     </div>
   );
 }

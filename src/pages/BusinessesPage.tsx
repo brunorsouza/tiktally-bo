@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, Building2 } from "lucide-react";
 import { useBusinesses, useBusinessMutations, useBusinessUserMutation } from "@/hooks/useBoCoupons";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input, Select } from "@/components/ui/input";
+import { Input, Select, SearchInput } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
-import { CenteredSpinner } from "@/components/ui/spinner";
+import { PageHeader, Toolbar, Field, Chip, Status } from "@/components/ds";
+import { DataTable, CellStack, RowActions, type Column } from "@/components/ds/DataTable";
 import { StatusBadge } from "./AffiliatesPage";
 import type { Business, BusinessInput, EntityStatus } from "@/types";
 
@@ -23,90 +22,95 @@ export function BusinessesPage() {
   const toggleStatus = (b: Business) =>
     update.mutate({ id: b.id, input: { status: b.status === "active" ? "suspended" : "active" } });
 
+  const colunas: Column<Business>[] = [
+    {
+      header: "Business",
+      cell: (b) => <CellStack title={b.name} subtitle={b.email ?? undefined} />,
+    },
+    {
+      header: "Afiliados",
+      align: "right",
+      width: "7rem",
+      cell: (b) => b.affiliates_count ?? 0,
+    },
+    {
+      header: "Acesso",
+      width: "9rem",
+      hideBelow: "md",
+      cell: (b) =>
+        b.owner_user_id ? (
+          <Status tone="success">Vinculado</Status>
+        ) : (
+          <Button variant="ghost" size="sm" onClick={() => setAccessFor(b)}>
+            Dar acesso
+          </Button>
+        ),
+    },
+    { header: "Status", width: "7rem", cell: (b) => <StatusBadge status={b.status} /> },
+    {
+      header: "",
+      align: "right",
+      width: "11rem",
+      cell: (b) => (
+        <RowActions>
+          <Button variant="ghost" size="sm" onClick={() => toggleStatus(b)}>
+            {b.status === "active" ? "Suspender" : "Reativar"}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setEditing(b)}>
+            Editar
+          </Button>
+        </RowActions>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">Businesses</h1>
-          <p className="text-sm text-muted-foreground">
-            Parceiros / agências que gerem uma carteira de afiliados e cupons.
-          </p>
-        </div>
-        <Button onClick={() => setCreating(true)}>
-          <Plus className="h-4 w-4" /> Novo business
-        </Button>
-      </div>
+      <PageHeader
+        title="Businesses"
+        description="Parceiros e agências que gerem uma carteira de afiliados e cupons."
+        meta={data && <span className="t-overline">{data.items.length}</span>}
+        actions={
+          <Button onClick={() => setCreating(true)}>
+            <Plus /> Novo business
+          </Button>
+        }
+      />
 
-      <Card>
-        <CardContent className="pt-5">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setSearch(searchInput.trim());
-            }}
-            className="relative min-w-[200px]"
-          >
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input className="pl-9" placeholder="Buscar por nome ou e-mail…" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
-          </form>
-        </CardContent>
-      </Card>
+      <Toolbar>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setSearch(searchInput.trim());
+          }}
+          className="flex min-w-[16rem] flex-1"
+        >
+          <SearchInput
+            icon={<Search />}
+            placeholder="Buscar por nome ou e-mail…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+        </form>
+      </Toolbar>
 
-      <Card>
-        <CardContent className="pt-5">
-          {isLoading ? (
-            <CenteredSpinner label="Carregando businesses…" />
-          ) : error ? (
-            <p className="py-8 text-center text-sm text-destructive">{(error as Error).message}</p>
-          ) : !data || data.items.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Nenhum business encontrado.</p>
-          ) : (
-            <Table>
-              <THead>
-                <TR className="hover:bg-transparent">
-                  <TH>Nome</TH>
-                  <TH>E-mail</TH>
-                  <TH className="text-right">Afiliados</TH>
-                  <TH>Acesso</TH>
-                  <TH>Status</TH>
-                  <TH className="text-right">Ações</TH>
-                </TR>
-              </THead>
-              <TBody>
-                {data.items.map((b) => (
-                  <TR key={b.id}>
-                    <TD className="font-medium">{b.name}</TD>
-                    <TD className="text-muted-foreground">{b.email ?? "—"}</TD>
-                    <TD className="text-right tabular-nums">{b.affiliates_count ?? 0}</TD>
-                    <TD>
-                      {b.owner_user_id ? (
-                        <span className="text-xs text-success">Vinculado</span>
-                      ) : (
-                        <Button variant="ghost" size="sm" onClick={() => setAccessFor(b)}>
-                          Criar acesso
-                        </Button>
-                      )}
-                    </TD>
-                    <TD>
-                      <StatusBadge status={b.status} />
-                    </TD>
-                    <TD className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => toggleStatus(b)}>
-                          {b.status === "active" ? "Suspender" : "Reativar"}
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setEditing(b)}>
-                          Editar
-                        </Button>
-                      </div>
-                    </TD>
-                  </TR>
-                ))}
-              </TBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <DataTable
+        rows={data?.items}
+        rowKey={(b) => b.id}
+        loading={isLoading}
+        error={error ? (error as Error).message : null}
+        empty={{
+          title: "Nenhum business ainda",
+          description: "Cadastre o primeiro parceiro para ele gerir a própria carteira.",
+          icon: <Building2 />,
+          action: (
+            <Button onClick={() => setCreating(true)}>
+              <Plus /> Novo business
+            </Button>
+          ),
+        }}
+        columns={colunas}
+      />
 
       {(creating || editing) && (
         <BusinessDialog business={editing} onClose={() => (editing ? setEditing(null) : setCreating(false))} />
@@ -135,12 +139,27 @@ function BusinessDialog({ business, onClose }: { business: Business | null; onCl
   };
 
   return (
-    <Dialog open onClose={onClose} title={isEdit ? `Editar ${business?.name}` : "Novo business"}>
+    <Dialog
+      open
+      onClose={onClose}
+      title={isEdit ? `Editar ${business?.name}` : "Novo business"}
+      description="Parceiro que gere a própria carteira de afiliados e cupons."
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancelar
+          </Button>
+          <Button onClick={submit} loading={busy} disabled={!canSubmit}>
+            {isEdit ? "Salvar" : "Criar business"}
+          </Button>
+        </>
+      }
+    >
       <div className="space-y-4">
         <Field label="Nome">
           <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus={!isEdit} placeholder="Nome da agência/parceiro" />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <Field label="E-mail">
             <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="contato@parceiro.com" />
           </Field>
@@ -154,14 +173,6 @@ function BusinessDialog({ business, onClose }: { business: Business | null; onCl
         <Field label="Notas (internas)">
           <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observações" />
         </Field>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={onClose} disabled={busy}>
-            Cancelar
-          </Button>
-          <Button onClick={submit} loading={busy} disabled={!canSubmit}>
-            {isEdit ? "Salvar" : "Criar business"}
-          </Button>
-        </div>
       </div>
     </Dialog>
   );
@@ -200,23 +211,38 @@ function AccessDialog({ business, onClose }: { business: Business; onClose: () =
   };
 
   return (
-    <Dialog open onClose={onClose} title={`Dar acesso — ${business.name}`}>
+    <Dialog
+      open
+      onClose={onClose}
+      title={`Dar acesso — ${business.name}`}
+      description="Ele passa a ver apenas a própria carteira (afiliados e comissões)."
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancelar
+          </Button>
+          <Button onClick={submit} loading={busy} disabled={!valid}>
+            {mode === "link" ? "Vincular conta" : "Criar acesso"}
+          </Button>
+        </>
+      }
+    >
       <div className="space-y-4">
         <div className="flex gap-2">
           <Chip active={mode === "link"} onClick={() => setMode("link")}>
-            Vincular conta existente
+            Vincular existente
           </Chip>
           <Chip active={mode === "create"} onClick={() => setMode("create")}>
             Criar conta nova
           </Chip>
         </div>
 
-        <p className="text-xs text-muted-foreground">
+        <p className="t-caption leading-relaxed">
           {mode === "link" ? (
             <>
-              Use quando o e-mail <strong>já tem login no TikTally</strong> (ex.: conta de Seller). A
-              mesma conta passa a ver também a carteira — sem criar login novo e sem alterar a senha
-              dela.
+              Use quando o e-mail <strong className="text-strong">já tem login no TikTally</strong>{" "}
+              (ex.: conta de Seller). A mesma conta passa a ver também a carteira — sem criar login
+              novo e sem alterar a senha dela.
             </>
           ) : (
             <>
@@ -231,52 +257,21 @@ function AccessDialog({ business, onClose }: { business: Business; onClose: () =
         </Field>
 
         {mode === "create" && (
-          <Field label="Senha provisória (mín. 8 caracteres)">
+          <Field label="Senha provisória" hint="Mínimo de 8 caracteres.">
             <div className="flex gap-2">
-              <Input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="senha provisória" className="font-mono" />
+              <Input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="senha provisória"
+                className="font-mono"
+              />
               <Button variant="outline" onClick={generate} type="button">
                 Gerar
               </Button>
             </div>
           </Field>
         )}
-
-        <p className="text-xs text-muted-foreground">
-          Em qualquer caso, ele vê <strong>apenas a carteira dele</strong> (afiliados e comissões).
-        </p>
-
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={onClose} disabled={busy}>
-            Cancelar
-          </Button>
-          <Button onClick={submit} loading={busy} disabled={!valid}>
-            {mode === "link" ? "Vincular conta" : "Criar acesso"}
-          </Button>
-        </div>
       </div>
     </Dialog>
-  );
-}
-
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-        active ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:bg-muted"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>
-      {children}
-    </label>
   );
 }

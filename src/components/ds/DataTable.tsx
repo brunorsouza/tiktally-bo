@@ -78,8 +78,8 @@ export function DataTable<T>({
                 style={c.width ? { width: c.width } : undefined}
                 className={cn(
                   // Régua dupla no cabeçalho: a assinatura do livro-razão
-                  "border-b-2 border-line-strong px-3 pb-1.5 pt-0 font-normal text-subtle",
-                  "text-[0.625rem] uppercase tracking-[0.14em]",
+                  "border-b-2 border-line-strong px-3 pb-1.5 pt-0 text-subtle",
+                  "text-[0.625rem] font-semibold uppercase tracking-[0.12em]",
                   alignCls[c.align ?? "left"],
                   c.hideBelow && hideCls[c.hideBelow]
                 )}
@@ -116,7 +116,7 @@ export function DataTable<T>({
                   <td
                     key={i}
                     className={cn(
-                      "px-3 py-2 text-[0.75rem] text-[hsl(var(--text))]",
+                      "px-3 py-2 text-[0.8125rem] text-[hsl(var(--text))]",
                       alignCls[c.align ?? "left"],
                       c.align === "right" && "tabular",
                       c.hideBelow && hideCls[c.hideBelow],
@@ -139,7 +139,7 @@ export function DataTable<T>({
 export function CellStack({ title, subtitle }: { title: ReactNode; subtitle?: ReactNode }) {
   return (
     <div className="min-w-0">
-      <div className="prose truncate text-[0.8125rem] font-medium text-strong">{title}</div>
+      <div className="truncate text-[0.8125rem] font-medium text-strong">{title}</div>
       {subtitle && <div className="truncate text-[0.6875rem] text-subtle">{subtitle}</div>}
     </div>
   );
