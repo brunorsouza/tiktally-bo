@@ -295,7 +295,7 @@ async function actionGetCoupon(db: SupabaseClient, p: Record<string, any>, ctx: 
 
   const { data: reds } = await db
     .from("coupon_redemptions")
-    .select("id, coupon_id, user_id, billing_id, subscription_id, discount_cents, redeemed_at")
+    .select("id, coupon_id, user_id, billing_id, subscription_id, discount_cents, redeemed_at, affiliate_id, business_id, plan_key, cycle, payment_method, gross_amount_cents, net_amount_cents, status")
     .eq("coupon_id", coupon.id)
     .order("redeemed_at", { ascending: false })
     .limit(200);
@@ -454,7 +454,7 @@ async function actionListRedemptions(db: SupabaseClient, p: Record<string, any>,
   const { data, error } = await build(
     db
       .from("coupon_redemptions")
-      .select("id, coupon_id, user_id, billing_id, subscription_id, discount_cents, redeemed_at")
+      .select("id, coupon_id, user_id, billing_id, subscription_id, discount_cents, redeemed_at, affiliate_id, business_id, plan_key, cycle, payment_method, gross_amount_cents, net_amount_cents, status")
       .order("redeemed_at", { ascending: false })
       .range(from, to)
   );
@@ -476,8 +476,10 @@ async function actionListRedemptions(db: SupabaseClient, p: Record<string, any>,
         coupon_kind: codeById.get(r.coupon_id)?.kind ?? null,
         // LGPD: parceiro vê assinante mascarado; só admin vê o e-mail completo.
         user_email: ctx.role === "admin" ? email : maskEmail(email),
-        // user_id também é PII de correlação — não vai pra parceiro.
+        // Identificadores de correlação do assinante — não vão pra parceiro.
         user_id: ctx.role === "admin" ? r.user_id : undefined,
+        billing_id: ctx.role === "admin" ? r.billing_id : undefined,
+        subscription_id: ctx.role === "admin" ? r.subscription_id : undefined,
       };
     })
   );
@@ -673,16 +675,21 @@ async function actionDeleteAffiliate(db: SupabaseClient, p: Record<string, any>,
     return fail("Afiliado fora da sua carteira.", 403);
   }
 
-  const [{ count: comCount }, { count: redCount }, { data: coupons }] = await Promise.all([
+  const [{ count: comCount }, { count: redCount }, { data: coupons }, { data: aff }] = await Promise.all([
     db.from("commissions").select("*", { count: "exact", head: true }).eq("affiliate_id", id),
     db.from("coupon_redemptions").select("*", { count: "exact", head: true }).eq("affiliate_id", id),
     db.from("coupons").select("id, redeems_count").eq("affiliate_id", id),
+    db.from("affiliates").select("user_id").eq("id", id).maybeSingle(),
   ]);
 
   // Ter CUPOM conta como histórico. Antes, apagar o afiliado desvinculava os
   // cupons (viravam "da casa") — o que permitia burlar o teto de 10% do cupom
   // da própria conta: criar afiliado → cupom de 20% → apagar o afiliado.
-  const hasHistory = (comCount ?? 0) > 0 || (redCount ?? 0) > 0 || (coupons?.length ?? 0) > 0;
+  // Ter LOGIN vinculado também conta como histórico: o hard delete apagaria a
+  // linha do afiliado mas NÃO o usuário do Auth, deixando conta órfã (e
+  // permitindo farmar contas em loop). Nesses casos, suspende.
+  const hasHistory =
+    (comCount ?? 0) > 0 || (redCount ?? 0) > 0 || (coupons?.length ?? 0) > 0 || !!aff?.user_id;
   if (hasHistory) {
     const { error } = await db
       .from("affiliates")
@@ -1181,7 +1188,12 @@ Deno.serve(async (req) => {
             "list_affiliates", "create_affiliate", "update_affiliate", "delete_affiliate",
             "list_coupons", "get_coupon", "create_coupon", "update_coupon", "delete_coupon",
             "check_code", "list_commissions", "list_redemptions",
-            "create_affiliate_user", "link_affiliate_user",
+            // Business só VINCULA conta que já existe. Criar login é ato de
+            // ADMIN: createUser define senha e marca o e-mail como confirmado
+            // sem prova de posse — um parceiro poderia "reservar" o e-mail de
+            // terceiros (a vítima não conseguiria mais se cadastrar) e farmar
+            // contas órfãs (criar afiliado → criar login → apagar afiliado).
+            "link_affiliate_user",
           ]
         // Afiliado: leitura do próprio desempenho + a própria chave PIX.
         : ["list_commissions", "list_redemptions", "my_performance", "update_my_pix"];
