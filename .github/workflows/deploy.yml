@@ -1,0 +1,76 @@
+name: Deploy backoffice to Hostinger
+
+# Dispara em push pra main (inclui merge de PR) e manualmente pela UI.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Um deploy por vez. Não cancela o que está no ar: interromper no meio do
+# upload deixaria o subdomínio servindo um build parcial.
+concurrency:
+  group: hostinger-deploy-backoffice
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # `npm run build` já roda `tsc --noEmit` antes do vite build, então um erro
+      # de tipo quebra o deploy aqui em vez de subir quebrado.
+      - name: Build
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_BO_FISCAL_FN: ${{ secrets.VITE_BO_FISCAL_FN }}
+          VITE_BO_COUPONS_FN: ${{ secrets.VITE_BO_COUPONS_FN }}
+
+      - name: Verificar build
+        run: |
+          if [ ! -d "./dist" ]; then
+            echo "::error::dist/ não existe após o build"
+            exit 1
+          fi
+          # Sem .htaccess, qualquer rota que não seja "/" devolve 404 no refresh.
+          if [ ! -f "./dist/.htaccess" ]; then
+            echo "::error::dist/.htaccess ausente — o SPA quebraria nas rotas internas"
+            exit 1
+          fi
+          # O modo preview serve dados MOCK e pula o login. Se vazar pro bundle
+          # de produção, o console mostra dados falsos pra quem abrir.
+          if grep -rqs "VITE_DEV_PREVIEW.*true" ./dist/assets 2>/dev/null; then
+            echo "::error::build contém VITE_DEV_PREVIEW=true — abortando"
+            exit 1
+          fi
+          echo "Tamanho: $(du -sh ./dist | cut -f1)"
+
+      - name: Deploy (API Hostinger)
+        # Zipa dist/, sobe via TUS e dispara o deploy pela API REST — mesmo
+        # fluxo do app principal. O domínio é o SUBDOMÍNIO: a Hostinger trata
+        # backoffice.tiktally.com.br como um site próprio, apontado pra
+        # public_html/backoffice, então isto NÃO toca no app principal.
+        run: bash ./scripts/deploy.sh --skip-build
+        env:
+          HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
+          HOSTINGER_DOMAIN: ${{ secrets.HOSTINGER_BACKOFFICE_DOMAIN || 'backoffice.tiktally.com.br' }}
+
+      - name: Resumo
+        if: success()
+        run: echo "::notice title=Deploy OK::https://backoffice.tiktally.com.br"
