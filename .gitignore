@@ -9,3 +9,6 @@ dist-ssr
 *.log
 .vite
 supabase/.temp
+
+# lockfile do `deno check` (npm run check:functions) — artefato local
+deno.lock
