@@ -27,7 +27,30 @@ const commissionMap: Record<string, { label: string; tone: Tone }> = {
   reversed: { label: "Estornada", tone: "danger" },
 };
 
-export function CouponStatusBadge({ status }: { status: CouponStatus | string | null }) {
+/**
+ * Estado EFETIVO do cupom, não o campo `status` cru.
+ *
+ * `coupons.status` só guarda ACTIVE/INACTIVE — expiração e esgotamento são
+ * derivados de data e contador. Renderizar o status cru fazia o backoffice
+ * anunciar "Ativo" num cupom que o checkout recusava como expirado.
+ */
+export function CouponStatusBadge({
+  status,
+  expired,
+  exhausted,
+  scheduled,
+}: {
+  status: CouponStatus | string | null;
+  expired?: boolean;
+  exhausted?: boolean;
+  scheduled?: boolean;
+}) {
+  // A ordem importa: inativo é decisão manual e vence o resto.
+  if (status !== "INACTIVE") {
+    if (expired) return <Status tone="danger">Expirado</Status>;
+    if (exhausted) return <Status tone="warning">Esgotado</Status>;
+    if (scheduled) return <Status tone="info">Agendado</Status>;
+  }
   const cfg = statusMap[status ?? ""] ?? { label: status || "—", tone: "neutral" as Tone };
   return <Status tone={cfg.tone}>{cfg.label}</Status>;
 }

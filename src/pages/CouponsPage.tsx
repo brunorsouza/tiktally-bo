@@ -92,7 +92,18 @@ export function CouponsPage() {
       hideBelow: "lg",
       cell: (c) => <span className="tabular text-subtle">{c.valid_until ? formatDate(c.valid_until) : "—"}</span>,
     },
-    { header: "Status", width: "6rem", cell: (c) => <CouponStatusBadge status={c.status} /> },
+    {
+      header: "Status",
+      width: "7rem",
+      cell: (c) => (
+        <CouponStatusBadge
+          status={c.status}
+          expired={c.expired}
+          exhausted={c.exhausted}
+          scheduled={c.scheduled}
+        />
+      ),
+    },
     {
       header: "",
       align: "right",
@@ -284,11 +295,20 @@ function CouponFormDialog({ coupon, onClose }: { coupon: Coupon | null; onClose:
     discountInput !== "" &&
     Number.isFinite(discountNum) &&
     (kind === "PERCENTAGE" ? discountNum >= 0 && discountNum <= 100 : discountNum > 0);
+  // Validade no passado: o cupom nasceria expirado e o checkout o recusaria,
+  // enquanto a lista mostraria "Ativo". Aconteceu de verdade — por isso o aviso
+  // é inline e bloqueia a criação, em vez de só falhar no servidor.
+  // Na EDIÇÃO é permitido: pôr data passada é a forma legítima de encerrar
+  // um cupom na hora.
+  const validUntilNoPassado =
+    !isEdit && !!validUntil && new Date(validUntil + "T23:59:59").getTime() < Date.now();
+
   const canSubmit =
     code.trim().length >= 3 &&
     codeCheck.available !== false &&
     // Business: desconto precisa respeitar o teto do tipo de cupom.
     (isBusiness ? businessPercent <= maxPercent : discountValid) &&
+    !validUntilNoPassado &&
     !busy;
 
   const toggle = (arr: string[], v: string, set: (a: string[]) => void) =>
@@ -420,7 +440,11 @@ function CouponFormDialog({ coupon, onClose }: { coupon: Coupon | null; onClose:
               <option value="INACTIVE">Inativo</option>
             </Select>
           </Field>
-          <Field label="Validade (expira em)">
+          <Field
+            label="Validade (expira em)"
+            error={validUntilNoPassado ? "Essa data já passou — o cupom nasceria expirado." : undefined}
+            hint={!validUntil ? "Em branco = não expira." : undefined}
+          >
             <Input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
           </Field>
         </div>

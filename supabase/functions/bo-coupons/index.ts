@@ -89,6 +89,20 @@ function isExhausted(c: { max_redeems: number | null; redeems_count: number | nu
   return (c.redeems_count ?? 0) >= max;
 }
 
+/**
+ * Expirado por DATA. O `status` da tabela continua 'ACTIVE' — a expiração é
+ * derivada, igual ao checkout faz (isCouponExpired). Sem derivar aqui, a tela
+ * mostrava "Ativo" num cupom que o checkout já recusava como expirado.
+ */
+function isExpired(c: { valid_until: string | null }) {
+  return !!c.valid_until && new Date(c.valid_until).getTime() < Date.now();
+}
+
+/** Ainda não entrou em vigor (valid_from no futuro). */
+function isScheduled(c: { valid_from?: string | null }) {
+  return !!c.valid_from && new Date(c.valid_from).getTime() > Date.now();
+}
+
 function normalizeCode(raw: unknown): string {
   return String(raw ?? "").trim().toUpperCase().replace(/\s+/g, "");
 }
@@ -129,7 +143,21 @@ function pickCouponFields(p: Record<string, any>, partial: boolean): Record<stri
     out.max_redeems = p.max_redeems === "" || p.max_redeems == null ? -1 : Math.round(Number(p.max_redeems));
   }
   if (p.valid_from !== undefined) out.valid_from = p.valid_from || null;
-  if (p.valid_until !== undefined) out.valid_until = p.valid_until || null;
+  if (p.valid_until !== undefined) {
+    out.valid_until = p.valid_until || null;
+    // Cupom não pode NASCER expirado. Aconteceu de verdade: um cupom criado
+    // com validade dois meses no passado ficava listado como "Ativo" no
+    // backoffice enquanto o checkout o recusava como expirado.
+    //
+    // Só barra na CRIAÇÃO (`partial === false`): numa edição, pôr uma data
+    // passada é a forma legítima de encerrar um cupom na hora.
+    if (!partial && out.valid_until) {
+      const ts = new Date(out.valid_until as string).getTime();
+      if (Number.isFinite(ts) && ts < Date.now()) {
+        throw new Error("A validade já passou. Escolha uma data futura ou deixe em branco para não expirar.");
+      }
+    }
+  }
   if (p.applicable_plans !== undefined) out.applicable_plans = sanitizeArray(p.applicable_plans, PLANS);
   if (p.applicable_cycles !== undefined) out.applicable_cycles = sanitizeArray(p.applicable_cycles, CYCLES);
   if (p.affiliate_id !== undefined) out.affiliate_id = p.affiliate_id ? String(p.affiliate_id) : null;
@@ -279,7 +307,7 @@ async function actionListCoupons(db: SupabaseClient, p: Record<string, any>) {
   );
   if (error) throw new Error(error.message);
 
-  const items = (data ?? []).map((c: any) => ({ ...c, exhausted: isExhausted(c) }));
+  const items = (data ?? []).map((c: any) => ({ ...c, exhausted: isExhausted(c), expired: isExpired(c), scheduled: isScheduled(c) }));
   const total = count ?? 0;
   return ok({ items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) });
 }
@@ -311,7 +339,7 @@ async function actionGetCoupon(db: SupabaseClient, p: Record<string, any>, ctx: 
       };
     })
   );
-  return ok({ coupon: { ...coupon, exhausted: isExhausted(coupon) }, redemptions });
+  return ok({ coupon: { ...coupon, exhausted: isExhausted(coupon), expired: isExpired(coupon), scheduled: isScheduled(coupon) }, redemptions });
 }
 
 async function actionCheckCode(db: SupabaseClient, p: Record<string, any>) {
@@ -359,7 +387,7 @@ async function actionCreateCoupon(db: SupabaseClient, p: Record<string, any>, ct
   const { data, error } = await db.from("coupons").insert(insert).select(COUPON_COLS).single();
   if (error) throw new Error(error.message);
   await audit(db, actorId, "coupon.create", "coupons", data.id, insert);
-  return ok({ ...data, exhausted: isExhausted(data) });
+  return ok({ ...data, exhausted: isExhausted(data), expired: isExpired(data), scheduled: isScheduled(data) });
 }
 
 async function actionUpdateCoupon(db: SupabaseClient, p: Record<string, any>, ctx: RoleCtx, actorId: string) {
@@ -392,7 +420,7 @@ async function actionUpdateCoupon(db: SupabaseClient, p: Record<string, any>, ct
   const { data, error } = await db.from("coupons").update(updates).eq("id", p.id).select(COUPON_COLS).single();
   if (error) throw new Error(error.message);
   await audit(db, actorId, "coupon.update", "coupons", String(p.id), updates);
-  return ok({ ...data, exhausted: isExhausted(data) });
+  return ok({ ...data, exhausted: isExhausted(data), expired: isExpired(data), scheduled: isScheduled(data) });
 }
 
 /**
@@ -1004,6 +1032,7 @@ async function actionMyPerformance(db: SupabaseClient, ctx: RoleCtx) {
   const list = (coupons ?? []).map((c: any) => ({
     ...c,
     exhausted: isExhausted(c),
+    expired: isExpired(c),
     share_url: `${APP_BASE_URL}/plans?cupom=${encodeURIComponent(c.code)}`,
   }));
 

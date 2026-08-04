@@ -149,6 +149,10 @@ export interface Coupon {
   updated_at: string | null;
   /** Derivado pelo gateway: max_redeems atingido. */
   exhausted?: boolean;
+  /** Derivado pelo gateway: valid_until já passou. O `status` segue ACTIVE. */
+  expired?: boolean;
+  /** Derivado pelo gateway: valid_from ainda no futuro. */
+  scheduled?: boolean;
 }
 
 export interface CouponRedemption {
@@ -302,6 +306,7 @@ export interface MyCoupon {
   valid_until: string | null;
   applies_to_renewals: boolean;
   exhausted?: boolean;
+  expired?: boolean;
   share_url: string;
 }
 

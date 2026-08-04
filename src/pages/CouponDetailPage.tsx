@@ -68,7 +68,12 @@ export function CouponDetailPage() {
             {coupon.code}
           </h1>
           <div className="mt-2.5 flex flex-wrap items-center gap-3">
-            <CouponStatusBadge status={coupon.status} />
+            <CouponStatusBadge
+              status={coupon.status}
+              expired={coupon.expired}
+              exhausted={coupon.exhausted}
+              scheduled={coupon.scheduled}
+            />
             <DiscountKindBadge kind={coupon.discount_kind} />
             {coupon.description && <span className="t-caption">{coupon.description}</span>}
           </div>
