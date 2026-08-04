@@ -28,6 +28,28 @@ import { createClient } from '@supabase/supabase-js';
 const URL = process.env.SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const HOOK = process.env.ASAAS_WEBHOOK_TOKEN;
+/**
+ * Onde está o webhook. Por padrão, o deployado.
+ *
+ * Dica: dá pra rodar a function LOCALMENTE e evitar precisar do token de
+ * produção — você escolhe o token na hora:
+ *
+ *   cd tiktok-shop-tally
+ *   ASAAS_ENV=sandbox ASAAS_WEBHOOK_TOKEN_SANDBOX=meu-token \
+ *   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+ *   npx deno@2 run --allow-net --allow-env \
+ *     supabase/functions/asaas-webhook-receiver/index.ts
+ *
+ *   # noutro terminal:
+ *   WEBHOOK_URL=http://localhost:8000 ASAAS_WEBHOOK_TOKEN=meu-token \
+ *   node scripts/e2e-commission-webhook.mjs
+ *
+ * O código é o mesmo do deploy; só o processo é local. Nenhuma chamada vai
+ * pra Asaas neste fluxo.
+ */
+const WEBHOOK_URL = process.env.WEBHOOK_URL
+  ? `${process.env.WEBHOOK_URL.replace(/\/$/, '')}`
+  : `${URL}/functions/v1/asaas-webhook-receiver`;
 
 if (!URL || !KEY) {
   console.error('✖ Faltam SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY.');
@@ -93,7 +115,7 @@ async function cleanup() {
 
 /** Dispara um evento no webhook, como a Asaas faria. */
 async function fireWebhook(event, payment) {
-  const res = await fetch(`${URL}/functions/v1/asaas-webhook-receiver`, {
+  const res = await fetch(WEBHOOK_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'asaas-access-token': HOOK },
     body: JSON.stringify({ id: `evt_${TAG}_${Date.now()}_${Math.random().toString(36).slice(2)}`, event, payment }),
