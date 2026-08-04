@@ -77,11 +77,17 @@ export default {
           foreground: "hsl(var(--destructive-foreground))",
         },
       },
+      // Raio quase nulo: instrumento, não app de consumo. O canto arredondado
+      // grande é uma das assinaturas do visual "template".
       borderRadius: {
-        sm: "0.25rem",
-        md: "0.375rem",
-        lg: "0.5rem",
-        xl: "0.75rem",
+        sm: "0.125rem",
+        md: "0.1875rem",
+        lg: "0.25rem",
+        xl: "0.375rem",
+      },
+      fontFamily: {
+        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ['"IBM Plex Mono"', "ui-monospace", "monospace"],
       },
       boxShadow: {
         1: "var(--shadow-1)",

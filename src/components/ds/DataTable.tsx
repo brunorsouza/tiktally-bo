@@ -69,16 +69,17 @@ export function DataTable<T>({
 
   return (
     <div className={cn("relative overflow-x-auto", className)}>
-      <table className="w-full border-collapse text-[0.8125rem]">
-        <thead className="sticky top-0 z-10 bg-surface-2">
+      <table className="w-full border-collapse">
+        <thead className="sticky top-0 z-10 bg-base">
           <tr>
             {columns.map((c, i) => (
               <th
                 key={i}
                 style={c.width ? { width: c.width } : undefined}
                 className={cn(
-                  "border-b border-line px-4 py-2.5 font-medium text-subtle",
-                  "text-[0.6875rem] uppercase tracking-[0.06em]",
+                  // Régua dupla no cabeçalho: a assinatura do livro-razão
+                  "border-b-2 border-line-strong px-3 pb-1.5 pt-0 font-normal text-subtle",
+                  "text-[0.625rem] uppercase tracking-[0.14em]",
                   alignCls[c.align ?? "left"],
                   c.hideBelow && hideCls[c.hideBelow]
                 )}
@@ -107,15 +108,15 @@ export function DataTable<T>({
                     : undefined
                 }
                 className={cn(
-                  "border-b border-line/60 transition-colors duration-ds ease-ds last:border-0",
-                  clickable && "cursor-pointer hover:bg-surface-3 focus-visible:bg-surface-3"
+                  "group border-b border-line/50 transition-colors duration-ds ease-ds last:border-0",
+                  clickable && "cursor-pointer hover:bg-surface-1 focus-visible:bg-surface-1"
                 )}
               >
                 {columns.map((c, i) => (
                   <td
                     key={i}
                     className={cn(
-                      "px-4 py-2.5 text-[hsl(var(--text))]",
+                      "px-3 py-2 text-[0.75rem] text-[hsl(var(--text))]",
                       alignCls[c.align ?? "left"],
                       c.align === "right" && "tabular",
                       c.hideBelow && hideCls[c.hideBelow],
@@ -138,8 +139,8 @@ export function DataTable<T>({
 export function CellStack({ title, subtitle }: { title: ReactNode; subtitle?: ReactNode }) {
   return (
     <div className="min-w-0">
-      <div className="truncate font-medium text-strong">{title}</div>
-      {subtitle && <div className="t-caption truncate">{subtitle}</div>}
+      <div className="prose truncate text-[0.8125rem] font-medium text-strong">{title}</div>
+      {subtitle && <div className="truncate text-[0.6875rem] text-subtle">{subtitle}</div>}
     </div>
   );
 }

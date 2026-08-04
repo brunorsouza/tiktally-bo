@@ -101,12 +101,12 @@ export function Layout({ children }: { children: ReactNode }) {
       <aside className="sticky top-0 flex h-screen w-[15rem] shrink-0 flex-col border-r border-line bg-surface-1">
         {/* Marca: monograma sólido na cor do produto, não um ícone genérico */}
         <div className="flex items-center gap-2.5 px-4 py-4">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-brand text-[0.8125rem] font-bold text-brand-foreground shadow-1">
+          <div className="flex h-6 w-6 items-center justify-center rounded-sm bg-brand font-mono text-[0.75rem] font-semibold text-brand-foreground">
             T
           </div>
           <div className="min-w-0 leading-tight">
-            <p className="text-[0.8125rem] font-semibold text-strong">TikTally</p>
-            <p className="t-caption truncate">{papel}</p>
+            <p className="text-[0.8125rem] font-semibold tracking-tight text-strong">TikTally</p>
+            <p className="font-mono text-[0.5625rem] uppercase tracking-[0.14em] text-subtle">{papel}</p>
           </div>
         </div>
 
@@ -122,7 +122,7 @@ export function Layout({ children }: { children: ReactNode }) {
                     end={item.end}
                     className={({ isActive }) =>
                       cn(
-                        "group relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[0.8125rem]",
+                        "group relative flex items-center gap-2.5 rounded-sm px-2.5 py-[0.3125rem] text-[0.8125rem]",
                         "transition-colors duration-ds ease-ds",
                         isActive
                           ? "bg-surface-3 font-medium text-strong"
@@ -135,7 +135,7 @@ export function Layout({ children }: { children: ReactNode }) {
                         {/* Marcador na marca: indica o ativo sem pintar o item inteiro */}
                         <span
                           className={cn(
-                            "absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2 rounded-r bg-brand transition-opacity duration-ds",
+                            "absolute left-0 top-1/2 h-full w-[2px] -translate-y-1/2 bg-brand transition-opacity duration-ds",
                             isActive ? "opacity-100" : "opacity-0"
                           )}
                         />
@@ -173,7 +173,7 @@ export function Layout({ children }: { children: ReactNode }) {
       </aside>
 
       <main className="min-w-0 flex-1">
-        <div className="mx-auto max-w-[80rem] animate-fade-in px-7 py-6">{children}</div>
+        <div className="mx-auto max-w-[78rem] animate-fade-in px-8 py-7">{children}</div>
       </main>
     </div>
   );

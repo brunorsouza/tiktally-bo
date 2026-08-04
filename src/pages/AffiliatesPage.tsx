@@ -11,7 +11,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Input, Select, SearchInput } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { Surface, PageHeader, Toolbar, Field, Chip, Status } from "@/components/ds";
+import { PageHeader, Toolbar, Field, Chip, Status } from "@/components/ds";
 import { DataTable, CellStack, RowActions, type Column } from "@/components/ds/DataTable";
 import { formatCurrency } from "@/lib/formatters";
 import type { Affiliate, AffiliateInput, CommissionType, EntityStatus } from "@/types";
@@ -141,8 +141,7 @@ export function AffiliatesPage() {
         </Select>
       </Toolbar>
 
-      <Surface className="overflow-hidden">
-        <DataTable
+      <DataTable
           rows={data?.items}
           rowKey={(a) => a.id}
           loading={isLoading}
@@ -156,9 +155,8 @@ export function AffiliatesPage() {
               </Button>
             ),
           }}
-          columns={colunas}
-        />
-      </Surface>
+        columns={colunas}
+      />
 
       {(creating || editing) && (
         <AffiliateDialog affiliate={editing} onClose={() => (editing ? setEditing(null) : setCreating(false))} />

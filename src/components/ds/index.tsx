@@ -20,8 +20,8 @@ export function Surface({
   return (
     <div
       className={cn(
-        "rounded-lg border border-line bg-surface-2 shadow-2",
-        inset && "bg-surface-1 shadow-none",
+        "rounded-md border border-line bg-surface-1",
+        inset && "bg-transparent",
         className
       )}
       {...props}
@@ -45,15 +45,15 @@ export function PageHeader({
   meta?: ReactNode;
 }) {
   return (
-    <header className="flex flex-wrap items-start justify-between gap-3">
+    <header className="flex flex-wrap items-end justify-between gap-3 border-b border-line pb-3">
       <div className="min-w-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-baseline gap-2.5">
           <h1 className="t-display">{title}</h1>
           {meta}
         </div>
-        {description && <p className="t-body mt-1 max-w-2xl">{description}</p>}
+        {description && <p className="t-caption mt-1 max-w-2xl leading-relaxed">{description}</p>}
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
     </header>
   );
 }
@@ -90,14 +90,14 @@ export function Stat({
   }[tone];
 
   return (
-    <Surface className="p-4">
-      <div className="flex items-start justify-between gap-2">
-        <p className="t-label">{label}</p>
-        {icon && <span className="text-subtle [&_svg]:h-3.5 [&_svg]:w-3.5">{icon}</span>}
+    <div className="border-l border-line pl-3.5">
+      <div className="flex items-center gap-1.5">
+        <p className="t-overline">{label}</p>
+        {icon && <span className="text-subtle [&_svg]:h-3 [&_svg]:w-3">{icon}</span>}
       </div>
       <p className={cn("t-metric mt-2", toneCls)}>{value}</p>
-      {hint && <p className="t-caption mt-1">{hint}</p>}
-    </Surface>
+      {hint && <p className="t-caption mt-1.5">{hint}</p>}
+    </div>
   );
 }
 
@@ -149,7 +149,7 @@ export function Chip({
       disabled={disabled}
       aria-pressed={active}
       className={cn(
-        "rounded-full border px-2.5 py-1 text-[0.75rem] font-medium transition-colors duration-ds ease-ds",
+        "rounded-sm border px-2 py-1 font-mono text-[0.6875rem] uppercase tracking-wider transition-colors duration-ds ease-ds",
         "disabled:pointer-events-none disabled:opacity-40",
         active
           ? "border-brand bg-brand-muted text-brand-strong"
@@ -178,7 +178,7 @@ export function Status({ tone = "neutral", children }: { tone?: Tone; children: 
 
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[0.75rem] font-medium text-[hsl(var(--text))]">
-      <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dot)} />
+      <span className={cn("h-1.5 w-1.5 shrink-0 rounded-[1px]", dot)} />
       {children}
     </span>
   );
