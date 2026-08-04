@@ -517,7 +517,40 @@ async function actionListPricing(db: SupabaseClient) {
     db.from("prices").select("id, plan_id, cycle, installments, installment_amount_cents, total_amount_cents, active").eq("active", true),
     db.from("settings").select("key, value, description").order("key"),
   ]);
-  return ok({ plans: plans ?? [], prices: prices ?? [], settings: settings ?? [] });
+  return ok({
+    plans: plans ?? [],
+    prices: prices ?? [],
+    settings: settings ?? [],
+    test_plan: testPlanState(settings ?? []),
+  });
+}
+
+/**
+ * Estado das três camadas da trava do plano de teste, pra tela não operar às
+ * cegas. Só chega aqui quem é admin (a action é admin-only pelo deny-by-default
+ * do RBAC), então listar os e-mails autorizados é aceitável — e necessário:
+ * ligar um plano sem saber quem ele libera é pior.
+ *
+ * Os e-mails são READ-ONLY: mudar quem entra exige o secret no Supabase, de
+ * propósito, pra um admin não conseguir se auto-conceder Pro por R$10.
+ */
+function testPlanState(settings: Array<{ key: string; value: unknown }>) {
+  const master = (Deno.env.get("TEST_PLAN_ENABLED") ?? "").trim().toLowerCase() === "true";
+  const emails = (Deno.env.get("TEST_PLAN_ALLOWED_EMAILS") ?? "")
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean);
+  const raw = settings.find((s) => s.key === "test_plan_enabled")?.value;
+  const toggle = raw === true || String(raw).trim().toLowerCase() === "true";
+  return {
+    /** Freio de emergência (secret) — só muda pelo Supabase. */
+    master_enabled: master,
+    /** Toggle desta tela (settings.test_plan_enabled). */
+    setting_enabled: toggle,
+    /** Efetivo: precisa das duas + allowlist não vazia. */
+    effective: master && toggle && emails.length > 0,
+    allowed_emails: emails,
+  };
 }
 
 async function actionUpdatePrice(db: SupabaseClient, p: Record<string, any>, actorId: string) {

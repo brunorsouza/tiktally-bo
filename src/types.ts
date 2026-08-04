@@ -357,10 +357,29 @@ export interface Setting {
   description: string | null;
 }
 
+/**
+ * Estado das três camadas da trava do plano de teste (R$10).
+ * Só `setting_enabled` é editável por aqui — as outras duas vêm de secrets do
+ * Supabase, de propósito (ver supabase/functions/_shared/billing/test-plan.ts
+ * no repo do app).
+ */
+export interface TestPlanState {
+  /** Freio de emergência (secret TEST_PLAN_ENABLED). Read-only. */
+  master_enabled: boolean;
+  /** Toggle desta tela (settings.test_plan_enabled). */
+  setting_enabled: boolean;
+  /** Resultado das três camadas juntas. */
+  effective: boolean;
+  /** Quem pode usar (secret TEST_PLAN_ALLOWED_EMAILS). Read-only. */
+  allowed_emails: string[];
+}
+
 export interface PricingData {
   plans: Plan[];
   prices: Price[];
   settings: Setting[];
+  /** Ausente em gateways antigos — tratar como indisponível. */
+  test_plan?: TestPlanState;
 }
 
 export interface Business {

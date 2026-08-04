@@ -30,6 +30,7 @@ import type {
   Plan,
   Price,
   PricingData,
+  TestPlanState,
   RedemptionFilters,
   Setting,
 } from "@/types";
@@ -107,19 +108,34 @@ const commissions: Commission[] = [
 const plans: Plan[] = [
   { id: "pln_pro", key: "pro", name: "TikTally Pro", description: null, status: "active", sort_order: 1 },
   { id: "pln_erp", key: "erp", name: "TikTally ERP", description: null, status: "active", sort_order: 2 },
+  // status 'test' = fora do /pricing público; só a allowlist alcança
+  { id: "pln_test", key: "test", name: "TikTally Teste (R$10)", description: null, status: "test", sort_order: 99 },
 ];
 const prices: Price[] = [
   { id: "prc_1", plan_id: "pln_pro", cycle: "yearly", installments: 12, installment_amount_cents: 49900, total_amount_cents: 598800, active: true },
   { id: "prc_2", plan_id: "pln_pro", cycle: "semiannually", installments: 6, installment_amount_cents: 59900, total_amount_cents: 359400, active: true },
   { id: "prc_3", plan_id: "pln_erp", cycle: "yearly", installments: 12, installment_amount_cents: 59900, total_amount_cents: 718800, active: true },
   { id: "prc_4", plan_id: "pln_erp", cycle: "semiannually", installments: 6, installment_amount_cents: 69900, total_amount_cents: 419400, active: true },
+  { id: "prc_5", plan_id: "pln_test", cycle: "yearly", installments: 1, installment_amount_cents: 1000, total_amount_cents: 1000, active: true },
+  { id: "prc_6", plan_id: "pln_test", cycle: "semiannually", installments: 1, installment_amount_cents: 1000, total_amount_cents: 1000, active: true },
 ];
 const settings: Setting[] = [
   { key: "coupon_discount_percent", value: 20, description: "Desconto padrão do cupom de afiliado (%)." },
   { key: "pix_discount_percent", value: 5, description: "Desconto adicional PIX à vista (%)." },
   { key: "discount_stacking", value: "multiplicative", description: "Empilhamento cupom+PIX (×0,80×0,95)." },
   { key: "commission_hold_days", value: 7, description: "Dias de carência até a comissão ficar elegível." },
+  { key: "test_plan_enabled", value: true, description: "Plano de teste de R$10 disponível para a allowlist." },
 ];
+
+/** Estado das 3 camadas da trava do plano de teste (mock do preview). */
+let testPlanLigado = true;
+
+const testPlan: TestPlanState = {
+  master_enabled: true,
+  setting_enabled: true,
+  effective: true,
+  allowed_emails: ["preview@tiktally.dev"],
+};
 
 function buildOverview(period = 30): CouponsOverview {
   const since = Date.now() - period * 864e5;
@@ -268,7 +284,8 @@ export const mockBoCoupons = {
   },
 
   // ── Planos & Preços ──
-  listPricing: (): Promise<PricingData> => delay({ plans, prices, settings }),
+  listPricing: (): Promise<PricingData> =>
+    delay({ plans, prices, settings, test_plan: { ...testPlan, setting_enabled: testPlanLigado, effective: testPlanLigado } }),
   updatePrice: (id: string, input: Partial<Price>): Promise<Price> => {
     const p = prices.find((x) => x.id === id);
     if (p) Object.assign(p, input);
@@ -277,6 +294,7 @@ export const mockBoCoupons = {
   updateSetting: (key: string, value: unknown): Promise<Setting> => {
     const s = settings.find((x) => x.key === key);
     if (s) s.value = value;
+    if (key === "test_plan_enabled") testPlanLigado = value === true;
     return delay(s ?? settings[0]);
   },
 

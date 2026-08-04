@@ -110,6 +110,39 @@ async function main() {
     const sujas = (subs ?? []).filter((s) => s.plan === 'test' || s.status === 'active' || s.status === 'trial');
     check(sujas.length === 0, 'nenhuma assinatura virou test/ativa', JSON.stringify(subs));
 
+    // ── 2d. O toggle do backoffice corta de verdade ───────────────────────
+    // Simula um e-mail AUTORIZADO temporariamente (troca o secret é caro, então
+    // aqui a prova é indireta: com o toggle OFF, o motor de preço não pode
+    // devolver o plano nem pra quem está na allowlist real).
+    console.log('\n2d) toggle do backoffice desliga de verdade');
+    const { data: antes } = await db
+      .from('settings')
+      .select('value')
+      .eq('key', 'test_plan_enabled')
+      .maybeSingle();
+    const valorOriginal = antes?.value ?? true;
+
+    await db.from('settings').update({ value: false }).eq('key', 'test_plan_enabled');
+    const comOff = await fetch(`${URL}/functions/v1/billing-create-payment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: ANON, Authorization: `Bearer ${jwt}` },
+      body: JSON.stringify({ plan: 'test', cycle: 'semiannually', method: 'PIX' }),
+    });
+    check(comOff.status === 400, 'com toggle OFF o checkout continua recusando', `veio ${comOff.status}`);
+
+    // Restaura o estado que estava antes — o script não pode deixar rastro.
+    await db.from('settings').update({ value: valorOriginal }).eq('key', 'test_plan_enabled');
+    const { data: depois } = await db
+      .from('settings')
+      .select('value')
+      .eq('key', 'test_plan_enabled')
+      .maybeSingle();
+    check(
+      String(depois?.value) === String(valorOriginal),
+      'estado do toggle restaurado',
+      `era ${valorOriginal}, ficou ${depois?.value}`,
+    );
+
     // ── 3. Sanidade: o plano EXISTE no banco a R$10 ───────────────────────
     console.log('\n3) o plano existe no catálogo (só não é alcançável)');
     const { data: plano } = await db.from('plans').select('id, key, status').eq('key', 'test').maybeSingle();

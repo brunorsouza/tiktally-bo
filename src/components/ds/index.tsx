@@ -326,6 +326,72 @@ export function Checkbox({
   );
 }
 
+/* ── Interruptor ──────────────────────────────────────────────────────────
+   Diferente do Checkbox de propósito: checkbox é "marque o que se aplica" num
+   formulário que ainda vai ser salvo; o interruptor é um estado LIGADO/
+   DESLIGADO que vale na hora. Usar o componente certo é o que faz a pessoa
+   entender que o clique já teve efeito. */
+export function Switch({
+  checked,
+  onChange,
+  label,
+  hint,
+  disabled,
+  busy,
+  tone = "brand",
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: ReactNode;
+  hint?: ReactNode;
+  disabled?: boolean;
+  busy?: boolean;
+  /** `danger` para ligar algo que custa dinheiro ou abre acesso. */
+  tone?: "brand" | "danger";
+}) {
+  const ligado = tone === "danger" ? "bg-danger border-danger" : "bg-brand border-brand";
+
+  return (
+    <label
+      className={cn(
+        "flex items-start gap-3",
+        disabled || busy ? "cursor-not-allowed opacity-55" : "cursor-pointer"
+      )}
+    >
+      <span className="relative flex h-5 items-center">
+        <input
+          type="checkbox"
+          role="switch"
+          checked={checked}
+          disabled={disabled || busy}
+          onChange={(e) => onChange(e.target.checked)}
+          className="peer sr-only"
+        />
+        <span
+          aria-hidden
+          className={cn(
+            "flex h-[1.125rem] w-8 shrink-0 items-center rounded-full border px-[2px]",
+            "transition-colors duration-ds ease-ds",
+            checked ? ligado : "border-line-strong bg-surface-3",
+            "peer-focus-visible:ring-1 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-1 peer-focus-visible:ring-offset-[hsl(var(--surface-1))]"
+          )}
+        >
+          <span
+            className={cn(
+              "h-3 w-3 rounded-full bg-white shadow-1 transition-transform duration-ds ease-ds",
+              checked ? "translate-x-[0.875rem]" : "translate-x-0"
+            )}
+          />
+        </span>
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[0.8125rem] font-medium text-strong">{label}</span>
+        {hint && <span className="t-caption mt-0.5 block leading-relaxed">{hint}</span>}
+      </span>
+    </label>
+  );
+}
+
 /* ── Chip selecionável ────────────────────────────────────────────────────
    Também estava duplicado em 2 telas. */
 export function Chip({
