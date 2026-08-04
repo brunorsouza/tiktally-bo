@@ -1,54 +1,162 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================================
+   TikTally Backoffice — Design System
+   ----------------------------------------------------------------------------
+   Princípios:
+   1. É FERRAMENTA, não site. Densidade alta, leitura rápida, zero "hero".
+   2. A marca é ACENTO, não fundo. O violeta da TikTally marca ação e estado —
+      não pinta superfície.
+   3. O DADO é o herói. Números tabulares, alinhados, com hierarquia por peso.
+   4. SUPERFÍCIE, não caixa. Elevação separa contexto melhor que borda em tudo.
+
+   Dark-only por decisão: é um console interno, usado em sessões longas.
+   ========================================================================= */
+
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --primary: 222 47% 11%;
-    --primary-foreground: 210 40% 98%;
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 222 47% 11%;
-  }
+    /* ── Marca (herdada do app TikTally) ───────────────────────────────── */
+    --brand: 262 83% 62%;
+    --brand-strong: 262 83% 70%;
+    --brand-muted: 262 40% 26%;
+    --brand-foreground: 0 0% 100%;
 
-  .dark {
-    --background: 222 47% 7%;
-    --foreground: 210 40% 98%;
-    --card: 222 44% 10%;
-    --card-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222 47% 11%;
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 0%;
-    --destructive: 0 72% 51%;
+    /* ── Superfícies: profundidade em 4 níveis, não "card em tudo" ─────── */
+    --surface-base: 260 22% 7%; /* fundo da aplicação */
+    --surface-1: 260 20% 10%; /* painéis, sidebar */
+    --surface-2: 260 18% 13%; /* cartões sobre painel */
+    --surface-3: 260 16% 17%; /* hover, inputs, realce */
+
+    /* ── Texto: 3 níveis, sem cinza ambíguo ───────────────────────────── */
+    --text-strong: 255 20% 98%;
+    --text: 252 12% 82%;
+    --text-muted: 250 10% 58%;
+
+    /* ── Linhas ───────────────────────────────────────────────────────── */
+    --line: 258 14% 20%;
+    --line-strong: 258 14% 28%;
+
+    /* ── Semânticos, calibrados pro fundo escuro ──────────────────────── */
+    --success: 152 62% 47%;
+    --success-surface: 152 45% 14%;
+    --warning: 38 92% 58%;
+    --warning-surface: 38 60% 14%;
+    --danger: 358 72% 60%;
+    --danger-surface: 358 50% 15%;
+    --info: 212 90% 62%;
+    --info-surface: 212 55% 15%;
+
+    /* ── Aliases de compatibilidade (código existente) ─────────────────── */
+    --background: var(--surface-base);
+    --foreground: var(--text-strong);
+    --card: var(--surface-2);
+    --card-foreground: var(--text-strong);
+    --muted: var(--surface-3);
+    --muted-foreground: var(--text-muted);
+    --primary: var(--brand);
+    --primary-foreground: var(--brand-foreground);
+    --destructive: var(--danger);
     --destructive-foreground: 0 0% 100%;
-    --border: 217 33% 20%;
-    --input: 217 33% 20%;
-    --ring: 213 27% 84%;
+    --success-foreground: 0 0% 100%;
+    --warning-foreground: 40 60% 8%;
+    --border: var(--line);
+    --input: var(--line);
+    --ring: var(--brand);
+
+    /* ── Elevação: sombra escura + luz de topo (funciona no dark) ──────── */
+    --shadow-1: 0 1px 2px hsl(260 40% 2% / 0.5);
+    --shadow-2: 0 2px 8px -2px hsl(260 40% 2% / 0.6), 0 1px 0 0 hsl(0 0% 100% / 0.03) inset;
+    --shadow-3: 0 12px 32px -8px hsl(260 40% 2% / 0.7), 0 1px 0 0 hsl(0 0% 100% / 0.04) inset;
+
+    /* ── Densidade de ferramenta (não de landing) ─────────────────────── */
+    --control-sm: 1.75rem; /* 28px */
+    --control-md: 2rem; /* 32px */
+    --control-lg: 2.25rem; /* 36px */
   }
 
   * {
     @apply border-border;
   }
 
+  html {
+    color-scheme: dark;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    /* cv11: '1' de haste reta — dígitos menos ambíguos em tabela financeira */
+    font-feature-settings: "cv11", "ss01";
+    font-variant-ligatures: contextual;
+  }
+
+  /* Todo número da interface é tabular: colunas de valor param de "dançar" */
+  th,
+  td,
+  input[type="number"],
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Foco visível e consistente — acessibilidade não é opcional */
+  :focus-visible {
+    outline: 2px solid hsl(var(--brand));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: hsl(var(--brand) / 0.32);
+  }
+
+  /* Scrollbar discreta, no tom do tema */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--line-strong));
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 99px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--text-muted));
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  /* Escala tipográfica — usar estas classes em vez de escolher tamanho no olho */
+  .t-display {
+    @apply text-[1.375rem] font-semibold leading-tight tracking-[-0.02em] text-[hsl(var(--text-strong))];
+  }
+  .t-title {
+    @apply text-[0.9375rem] font-semibold leading-snug tracking-[-0.01em] text-[hsl(var(--text-strong))];
+  }
+  .t-body {
+    @apply text-[0.8125rem] leading-relaxed text-[hsl(var(--text))];
+  }
+  .t-label {
+    @apply text-[0.75rem] font-medium leading-none text-[hsl(var(--text-muted))];
+  }
+  .t-caption {
+    @apply text-[0.6875rem] leading-normal text-[hsl(var(--text-muted))];
+  }
+  /* Rótulo de seção da navegação */
+  .t-overline {
+    @apply text-[0.625rem] font-semibold uppercase tracking-[0.09em] text-[hsl(var(--text-muted))];
+  }
+  /* Número em destaque (métricas) */
+  .t-metric {
+    @apply text-[1.5rem] font-semibold leading-none tracking-[-0.02em] text-[hsl(var(--text-strong))];
+    font-variant-numeric: tabular-nums;
   }
 }

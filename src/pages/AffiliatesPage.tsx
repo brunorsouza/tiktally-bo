@@ -8,12 +8,11 @@ import {
   useMe,
 } from "@/hooks/useBoCoupons";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input, Select } from "@/components/ui/input";
+import { Input, Select, SearchInput } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
-import { CenteredSpinner } from "@/components/ui/spinner";
+import { Surface, PageHeader, Toolbar, Field, Chip, Status } from "@/components/ds";
+import { DataTable, CellStack, RowActions, type Column } from "@/components/ds/DataTable";
 import { formatCurrency } from "@/lib/formatters";
 import type { Affiliate, AffiliateInput, CommissionType, EntityStatus } from "@/types";
 
@@ -40,105 +39,126 @@ export function AffiliatesPage() {
   const toggleStatus = (a: Affiliate) =>
     update.mutate({ id: a.id, input: { status: a.status === "active" ? "suspended" : "active" } });
 
+  const colunas: Column<Affiliate>[] = [
+    {
+      header: "Afiliado",
+      cell: (a) => <CellStack title={a.name} subtitle={a.email} />,
+    },
+    {
+      header: "Carteira",
+      hideBelow: "md",
+      cell: (a) => a.business_name ?? <span className="text-subtle">Independente</span>,
+    },
+    {
+      header: "Chave PIX",
+      hideBelow: "lg",
+      cell: (a) => (a.pix_key ? <span className="tabular">{a.pix_key}</span> : <span className="text-subtle">—</span>),
+    },
+    { header: "Comissão", align: "right", width: "7rem", cell: (a) => commissionLabel(a) },
+    {
+      header: "Acesso",
+      width: "8rem",
+      cell: (a) =>
+        a.user_id ? (
+          <Status tone="success">Vinculado</Status>
+        ) : (
+          <Button variant="ghost" size="sm" onClick={() => setAccessFor(a)}>
+            Dar acesso
+          </Button>
+        ),
+    },
+    {
+      header: "Status",
+      width: "6.5rem",
+      cell: (a) => (
+        <Status tone={a.status === "active" ? "success" : "neutral"}>
+          {a.status === "active" ? "Ativo" : "Suspenso"}
+        </Status>
+      ),
+    },
+    {
+      header: "",
+      align: "right",
+      width: "9rem",
+      cell: (a) => (
+        <RowActions>
+          <Button variant="ghost" size="sm" onClick={() => toggleStatus(a)}>
+            {a.status === "active" ? "Suspender" : "Reativar"}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setEditing(a)}>
+            Editar
+          </Button>
+          <Button variant="ghost" size="sm" className="hover:text-danger" onClick={() => setDeleting(a)}>
+            Excluir
+          </Button>
+        </RowActions>
+      ),
+    },
+  ];
+
   return (
-    <div className="space-y-5">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">Afiliados</h1>
-          <p className="text-sm text-muted-foreground">
-            {isBusiness
-              ? "Afiliados da sua carteira. Eles usam cupons vinculados à sua conta."
-              : "Afiliados do programa — independentes ou vinculados à carteira de um business."}
-          </p>
-        </div>
-        <Button onClick={() => setCreating(true)}>
-          <Plus className="h-4 w-4" /> Novo afiliado
-        </Button>
-      </div>
+    <div className="space-y-4">
+      <PageHeader
+        title="Afiliados"
+        description={
+          isBusiness
+            ? "Afiliados da sua carteira. Eles usam cupons vinculados à sua conta."
+            : "Afiliados do programa — independentes ou vinculados à carteira de um business."
+        }
+        meta={
+          data ? <span className="t-caption rounded bg-surface-3 px-1.5 py-0.5">{data.total}</span> : null
+        }
+        actions={
+          <Button onClick={() => setCreating(true)}>
+            <Plus /> Novo afiliado
+          </Button>
+        }
+      />
 
-      <Card>
-        <CardContent className="flex flex-wrap items-center gap-3 pt-5">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setSearch(searchInput.trim());
-            }}
-            className="relative min-w-[200px] flex-1"
-          >
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input className="pl-9" placeholder="Buscar por nome ou e-mail…" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
-          </form>
-          <Select className="w-44" value={status} onChange={(e) => setStatus(e.target.value as EntityStatus | "")}>
-            <option value="">Todos os status</option>
-            <option value="active">Ativos</option>
-            <option value="suspended">Suspensos</option>
-          </Select>
-        </CardContent>
-      </Card>
+      <Toolbar>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setSearch(searchInput.trim());
+          }}
+          className="flex min-w-[16rem] flex-1"
+        >
+          <SearchInput
+            icon={<Search />}
+            placeholder="Buscar por nome ou e-mail…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+        </form>
+        <Select
+          className="w-40"
+          value={status}
+          onChange={(e) => setStatus(e.target.value as EntityStatus | "")}
+        >
+          <option value="">Todos os status</option>
+          <option value="active">Ativos</option>
+          <option value="suspended">Suspensos</option>
+        </Select>
+      </Toolbar>
 
-      <Card>
-        <CardContent className="pt-5">
-          {isLoading ? (
-            <CenteredSpinner label="Carregando afiliados…" />
-          ) : error ? (
-            <p className="py-8 text-center text-sm text-destructive">{(error as Error).message}</p>
-          ) : !data || data.items.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Nenhum afiliado encontrado.</p>
-          ) : (
-            <Table>
-              <THead>
-                <TR className="hover:bg-transparent">
-                  <TH>Nome</TH>
-                  <TH>Business</TH>
-                  <TH>Chave PIX</TH>
-                  <TH className="text-right">Comissão</TH>
-                  <TH>Acesso</TH>
-                  <TH>Status</TH>
-                  <TH className="text-right">Ações</TH>
-                </TR>
-              </THead>
-              <TBody>
-                {data.items.map((a) => (
-                  <TR key={a.id}>
-                    <TD>
-                      <span className="font-medium">{a.name}</span>
-                      {a.email && <span className="block text-xs text-muted-foreground">{a.email}</span>}
-                    </TD>
-                    <TD className="text-muted-foreground">{a.business_name ?? "— independente"}</TD>
-                    <TD className="text-muted-foreground">{a.pix_key ?? "—"}</TD>
-                    <TD className="text-right tabular-nums">{commissionLabel(a)}</TD>
-                    <TD>
-                      {a.user_id ? (
-                        <span className="text-xs text-success">Vinculado</span>
-                      ) : (
-                        <Button variant="ghost" size="sm" onClick={() => setAccessFor(a)}>
-                          Dar acesso
-                        </Button>
-                      )}
-                    </TD>
-                    <TD>
-                      <StatusBadge status={a.status} />
-                    </TD>
-                    <TD className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => toggleStatus(a)}>
-                          {a.status === "active" ? "Suspender" : "Reativar"}
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setEditing(a)}>
-                          Editar
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setDeleting(a)}>
-                          Excluir
-                        </Button>
-                      </div>
-                    </TD>
-                  </TR>
-                ))}
-              </TBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <Surface className="overflow-hidden">
+        <DataTable
+          rows={data?.items}
+          rowKey={(a) => a.id}
+          loading={isLoading}
+          error={error ? (error as Error).message : null}
+          empty={{
+            title: "Nenhum afiliado ainda",
+            description: "Crie o primeiro afiliado para começar a distribuir cupons.",
+            action: (
+              <Button onClick={() => setCreating(true)}>
+                <Plus /> Novo afiliado
+              </Button>
+            ),
+          }}
+          columns={colunas}
+        />
+      </Surface>
 
       {(creating || editing) && (
         <AffiliateDialog affiliate={editing} onClose={() => (editing ? setEditing(null) : setCreating(false))} />
@@ -166,13 +186,10 @@ export function AffiliatesPage() {
   );
 }
 
+/** Mantido para as telas que já importavam daqui; agora usa o Status do DS. */
 export function StatusBadge({ status }: { status: string }) {
   const active = status === "active";
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${active ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>
-      {active ? "Ativo" : "Suspenso"}
-    </span>
-  );
+  return <Status tone={active ? "success" : "neutral"}>{active ? "Ativo" : "Suspenso"}</Status>;
 }
 
 function AffiliateDialog({ affiliate, onClose }: { affiliate: Affiliate | null; onClose: () => void }) {
@@ -365,25 +382,4 @@ function AffiliateAccessDialog({ affiliate, onClose }: { affiliate: Affiliate; o
   );
 }
 
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-        active ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:bg-muted"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>
-      {children}
-    </label>
-  );
-}
