@@ -527,8 +527,28 @@ async function actionUpdatePrice(db: SupabaseClient, p: Record<string, any>, act
   if (p.total_amount_cents !== undefined) updates.total_amount_cents = Math.round(Number(p.total_amount_cents));
   if (p.installments !== undefined) updates.installments = Math.round(Number(p.installments));
   if (!Object.keys(updates).length) return fail("Nada para atualizar");
+  // Preço ZERO/negativo não pode passar: o front exibiria R$ 0,00 enquanto o
+  // checkout cairia no fallback e cobraria o preço cheio.
   for (const [k, v] of Object.entries(updates)) {
-    if (!Number.isFinite(v as number) || (v as number) < 0) return fail(`Valor inválido: ${k}`);
+    if (!Number.isFinite(v as number) || (v as number) <= 0) return fail(`Valor inválido em ${k}: use um número maior que zero.`);
+  }
+  // Invariante da tabela: parcela × N == total. Sem isso, landing e tela de
+  // planos anunciam parcelas diferentes pro mesmo plano.
+  const { data: cur } = await db
+    .from("prices")
+    .select("installments, installment_amount_cents, total_amount_cents")
+    .eq("id", p.id)
+    .maybeSingle();
+  if (cur) {
+    const inst = Number(updates.installments ?? cur.installments);
+    const parcela = Number(updates.installment_amount_cents ?? cur.installment_amount_cents);
+    const total = Number(updates.total_amount_cents ?? cur.total_amount_cents);
+    if (parcela * inst !== total) {
+      return fail(
+        `Preço inconsistente: ${inst}× ${(parcela / 100).toFixed(2)} = ${((parcela * inst) / 100).toFixed(2)}, ` +
+          `mas o total informado é ${(total / 100).toFixed(2)}.`
+      );
+    }
   }
   updates.updated_at = new Date().toISOString();
   const { data, error } = await db.from("prices").update(updates).eq("id", p.id).select("*").single();
@@ -875,10 +895,27 @@ interface RoleCtx {
 async function resolveRole(db: SupabaseClient, userId: string): Promise<RoleCtx> {
   const { data: profile } = await db.from("profiles").select("is_admin").eq("id", userId).maybeSingle();
   if (profile?.is_admin) return { role: "admin", businessId: null, affiliateId: null };
-  const { data: biz } = await db.from("businesses").select("id").eq("owner_user_id", userId).maybeSingle();
-  if (biz) return { role: "business", businessId: biz.id as string, affiliateId: null };
-  const { data: aff } = await db.from("affiliates").select("id, business_id").eq("user_id", userId).maybeSingle();
-  if (aff) return { role: "affiliate", businessId: (aff.business_id as string) ?? null, affiliateId: aff.id as string };
+  // Parceiro SUSPENSO perde o acesso — antes o status era ignorado aqui, e
+  // suspender no admin não cortava nada (o suspenso seguia com CRUD e ainda
+  // podia trocar a própria chave PIX antes de um pagamento de comissão).
+  const { data: biz } = await db
+    .from("businesses")
+    .select("id, status")
+    .eq("owner_user_id", userId)
+    .maybeSingle();
+  if (biz) {
+    if (biz.status !== "active") return { role: "none", businessId: null, affiliateId: null };
+    return { role: "business", businessId: biz.id as string, affiliateId: null };
+  }
+  const { data: aff } = await db
+    .from("affiliates")
+    .select("id, business_id, status")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (aff) {
+    if (aff.status !== "active") return { role: "none", businessId: null, affiliateId: null };
+    return { role: "affiliate", businessId: (aff.business_id as string) ?? null, affiliateId: aff.id as string };
+  }
   return { role: "none", businessId: null, affiliateId: null };
 }
 
