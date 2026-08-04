@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { Search, Plus } from "lucide-react";
-import { useAffiliates, useAffiliateMutations, useBusinesses, useMe } from "@/hooks/useBoCoupons";
+import {
+  useAffiliates,
+  useAffiliateMutations,
+  useAffiliateUserMutation,
+  useBusinesses,
+  useMe,
+} from "@/hooks/useBoCoupons";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/input";
@@ -24,6 +30,7 @@ export function AffiliatesPage() {
   const [editing, setEditing] = useState<Affiliate | null>(null);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<Affiliate | null>(null);
+  const [accessFor, setAccessFor] = useState<Affiliate | null>(null);
 
   const { data, isLoading, error } = useAffiliates({ search: search || undefined, status: status || undefined });
   const { update, remove } = useAffiliateMutations();
@@ -85,6 +92,7 @@ export function AffiliatesPage() {
                   <TH>Business</TH>
                   <TH>Chave PIX</TH>
                   <TH className="text-right">Comissão</TH>
+                  <TH>Acesso</TH>
                   <TH>Status</TH>
                   <TH className="text-right">Ações</TH>
                 </TR>
@@ -99,6 +107,15 @@ export function AffiliatesPage() {
                     <TD className="text-muted-foreground">{a.business_name ?? "— independente"}</TD>
                     <TD className="text-muted-foreground">{a.pix_key ?? "—"}</TD>
                     <TD className="text-right tabular-nums">{commissionLabel(a)}</TD>
+                    <TD>
+                      {a.user_id ? (
+                        <span className="text-xs text-success">Vinculado</span>
+                      ) : (
+                        <Button variant="ghost" size="sm" onClick={() => setAccessFor(a)}>
+                          Dar acesso
+                        </Button>
+                      )}
+                    </TD>
                     <TD>
                       <StatusBadge status={a.status} />
                     </TD>
@@ -126,6 +143,8 @@ export function AffiliatesPage() {
       {(creating || editing) && (
         <AffiliateDialog affiliate={editing} onClose={() => (editing ? setEditing(null) : setCreating(false))} />
       )}
+
+      {accessFor && <AffiliateAccessDialog affiliate={accessFor} onClose={() => setAccessFor(null)} />}
 
       {deleting && (
         <ConfirmDialog
@@ -257,6 +276,106 @@ function AffiliateDialog({ affiliate, onClose }: { affiliate: Affiliate | null; 
         </div>
       </div>
     </Dialog>
+  );
+}
+
+/**
+ * Dá acesso ao afiliado ao backoffice (painel do próprio desempenho).
+ * Também é o que ATIVA o anti-fraude de auto-uso: sem `user_id` vinculado, o
+ * servidor não consegue barrar o afiliado de comprar com o próprio cupom.
+ */
+function AffiliateAccessDialog({ affiliate, onClose }: { affiliate: Affiliate; onClose: () => void }) {
+  const { create, link } = useAffiliateUserMutation();
+  const [mode, setMode] = useState<"link" | "create">("link");
+  const [email, setEmail] = useState(affiliate.email ?? "");
+  const [password, setPassword] = useState("");
+
+  const generate = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+    const bytes = new Uint32Array(14);
+    crypto.getRandomValues(bytes);
+    setPassword(Array.from(bytes, (b) => chars[b % chars.length]).join(""));
+  };
+
+  const emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim());
+  const valid = mode === "link" ? emailOk : emailOk && password.length >= 8;
+  const busy = create.isPending || link.isPending;
+
+  const submit = () => {
+    if (mode === "link") {
+      link.mutate({ affiliateId: affiliate.id, email: email.trim() }, { onSuccess: onClose });
+    } else {
+      create.mutate({ affiliate_id: affiliate.id, email: email.trim(), password }, { onSuccess: onClose });
+    }
+  };
+
+  return (
+    <Dialog open onClose={onClose} title={`Dar acesso — ${affiliate.name}`}>
+      <div className="space-y-4">
+        <div className="flex gap-2">
+          <Chip active={mode === "link"} onClick={() => setMode("link")}>
+            Vincular conta existente
+          </Chip>
+          <Chip active={mode === "create"} onClick={() => setMode("create")}>
+            Criar conta nova
+          </Chip>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          {mode === "link" ? (
+            <>
+              Use quando o e-mail <strong>já tem login no TikTally</strong>. A mesma conta passa a ver
+              também o painel do afiliado — sem criar login novo e sem alterar a senha dela.
+            </>
+          ) : (
+            <>Cria um login novo. Envie a senha por um canal seguro e peça pra trocar depois.</>
+          )}
+        </p>
+
+        <Field label="E-mail de acesso">
+          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="afiliado@email.com" />
+        </Field>
+
+        {mode === "create" && (
+          <Field label="Senha provisória (mín. 8 caracteres)">
+            <div className="flex gap-2">
+              <Input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="senha provisória" className="font-mono" />
+              <Button variant="outline" onClick={generate} type="button">
+                Gerar
+              </Button>
+            </div>
+          </Field>
+        )}
+
+        <p className="text-xs text-muted-foreground">
+          Ele vê <strong>apenas o próprio desempenho</strong> (cupom, usos e comissões) e edita só a
+          própria chave PIX. Vincular também <strong>impede</strong> que ele use o próprio cupom.
+        </p>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={onClose} disabled={busy}>
+            Cancelar
+          </Button>
+          <Button onClick={submit} loading={busy} disabled={!valid}>
+            {mode === "link" ? "Vincular conta" : "Criar acesso"}
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
+function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+        active ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:bg-muted"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

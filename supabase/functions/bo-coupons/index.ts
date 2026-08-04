@@ -986,6 +986,90 @@ async function actionUpdateMyPix(db: SupabaseClient, p: Record<string, any>, act
   return ok(data);
 }
 
+/**
+ * Dá acesso ao AFILIADO: cria um login novo ou vincula uma conta existente ao
+ * `affiliates.user_id`.
+ *
+ * Sem isso o afiliado não existe como usuário: `resolveRole` identifica
+ * afiliado por `user_id`, então ele caía em role 'none' → 403, e o anti-fraude
+ * de auto-uso (`aff.user_id === user.id`) nunca disparava.
+ *
+ * @param mode "create" (e-mail + senha) | "link" (conta que já existe)
+ */
+async function actionAffiliateUser(
+  db: SupabaseClient,
+  p: Record<string, any>,
+  actorId: string,
+  ctx: RoleCtx,
+  mode: "create" | "link",
+) {
+  if (!p.affiliate_id) return fail("affiliate_id obrigatório");
+  const affiliateId = String(p.affiliate_id);
+  const email = String(p.email ?? "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail("E-mail inválido");
+
+  // Business só mexe na própria carteira.
+  if (ctx.role === "business" && !(await affiliateInWallet(db, ctx.businessId!, affiliateId))) {
+    return fail("Afiliado fora da sua carteira.", 403);
+  }
+
+  const { data: aff } = await db.from("affiliates").select("id, user_id, name").eq("id", affiliateId).maybeSingle();
+  if (!aff) return fail("Afiliado não encontrado", 404);
+  if (aff.user_id) return fail("Este afiliado já tem um acesso vinculado");
+
+  let userId: string;
+
+  if (mode === "link") {
+    const { data: found, error: rpcErr } = await db.rpc("bo_user_id_by_email", { p_email: email });
+    if (rpcErr) throw new Error(rpcErr.message);
+    if (!found) return fail('Nenhuma conta encontrada com esse e-mail. Use "Criar conta nova".', 404);
+    userId = found as string;
+  } else {
+    if (!p.password || String(p.password).length < 8) return fail("Senha deve ter ao menos 8 caracteres");
+    const { data: created, error: cErr } = await db.auth.admin.createUser({
+      email,
+      password: String(p.password),
+      email_confirm: true,
+    });
+    if (cErr || !created?.user?.id) {
+      const msg = cErr?.message ?? "sem user id";
+      if (/registered|already|exists/i.test(msg)) {
+        return fail(
+          "Já existe uma conta com esse e-mail (ex.: login do TikTally). " +
+            'Use "Vincular conta existente".'
+        );
+      }
+      return fail(`Falha ao criar acesso: ${msg}`);
+    }
+    userId = created.user.id;
+  }
+
+  // Uma conta = no máximo um afiliado, e não pode ser dona de um business
+  // (evita escopo ambíguo no RBAC, onde business tem prioridade).
+  const { data: otherAff } = await db
+    .from("affiliates")
+    .select("id, name")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (otherAff) return fail(`Essa conta já é do afiliado "${otherAff.name}".`);
+
+  const { data: ownedBiz } = await db
+    .from("businesses")
+    .select("id, name")
+    .eq("owner_user_id", userId)
+    .maybeSingle();
+  if (ownedBiz) return fail(`Essa conta já é dona do business "${ownedBiz.name}" — use outra.`);
+
+  const { error: linkErr } = await db
+    .from("affiliates")
+    .update({ user_id: userId, updated_at: new Date().toISOString() })
+    .eq("id", affiliateId);
+  if (linkErr) throw new Error(linkErr.message);
+
+  await audit(db, actorId, `affiliate.${mode}_user`, "affiliates", affiliateId, { email });
+  return ok({ affiliate_id: affiliateId, user_id: userId, email, linked: mode === "link" });
+}
+
 /** Admin cria um login (Supabase Auth) e vincula ao business (owner_user_id). */
 async function actionCreateBusinessUser(db: SupabaseClient, p: Record<string, any>, actorId: string) {
   if (!p.business_id) return fail("business_id obrigatório");
@@ -1097,6 +1181,7 @@ Deno.serve(async (req) => {
             "list_affiliates", "create_affiliate", "update_affiliate", "delete_affiliate",
             "list_coupons", "get_coupon", "create_coupon", "update_coupon", "delete_coupon",
             "check_code", "list_commissions", "list_redemptions",
+            "create_affiliate_user", "link_affiliate_user",
           ]
         // Afiliado: leitura do próprio desempenho + a própria chave PIX.
         : ["list_commissions", "list_redemptions", "my_performance", "update_my_pix"];
@@ -1133,6 +1218,10 @@ Deno.serve(async (req) => {
         return await actionCreateBusinessUser(db, body, actorId);
       case "link_business_user":
         return await actionLinkBusinessUser(db, body, actorId);
+      case "create_affiliate_user":
+        return await actionAffiliateUser(db, body, actorId, ctx, "create");
+      case "link_affiliate_user":
+        return await actionAffiliateUser(db, body, actorId, ctx, "link");
       case "overview":
         return await actionOverview(db, body);
       case "list_coupons":

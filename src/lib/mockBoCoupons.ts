@@ -7,6 +7,7 @@ import type {
   Affiliate,
   AffiliateFilters,
   AffiliateInput,
+  AffiliateUserInput,
   Business,
   BusinessInput,
   BusinessUserInput,
@@ -323,6 +324,20 @@ export const mockBoCoupons = {
       suspended: hasHistory,
       reason: hasHistory ? "Afiliado tem histórico — foi suspenso em vez de excluído." : null,
     });
+  },
+
+  createAffiliateUser: (input: AffiliateUserInput) => {
+    const a = affiliates.find((x) => x.id === input.affiliate_id);
+    const uid = nextId("usr");
+    if (a) a.user_id = uid;
+    return delay({ affiliate_id: input.affiliate_id, user_id: uid, email: input.email });
+  },
+
+  linkAffiliateUser: (affiliateId: string, email: string) => {
+    const a = affiliates.find((x) => x.id === affiliateId);
+    const uid = nextId("usr");
+    if (a) a.user_id = uid;
+    return delay({ affiliate_id: affiliateId, user_id: uid, email });
   },
 
   // ── Businesses ──

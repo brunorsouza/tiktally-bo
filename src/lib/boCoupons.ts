@@ -4,6 +4,7 @@ import type {
   Affiliate,
   AffiliateFilters,
   AffiliateInput,
+  AffiliateUserInput,
   Business,
   BusinessInput,
   BusinessUserInput,
@@ -115,6 +116,17 @@ const realBoCoupons = {
 
   /** Apaga o afiliado; se tiver histórico, o servidor suspende (soft delete). */
   deleteAffiliate: (id: string) => call<DeleteResult>("delete_affiliate", { id }),
+
+  /** Cria um login novo para o afiliado e vincula. */
+  createAffiliateUser: (input: AffiliateUserInput) =>
+    call<{ affiliate_id: string; user_id: string; email: string }>("create_affiliate_user", { ...input }),
+
+  /** Vincula uma conta que JÁ existe (ex.: login do TikTally) ao afiliado. */
+  linkAffiliateUser: (affiliateId: string, email: string) =>
+    call<{ affiliate_id: string; user_id: string; email: string }>("link_affiliate_user", {
+      affiliate_id: affiliateId,
+      email,
+    }),
 
   // ── Businesses ──
   listBusinesses: (search?: string) => call<{ items: Business[] }>("list_businesses", { search }),

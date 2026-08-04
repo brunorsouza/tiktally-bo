@@ -4,6 +4,7 @@ import { useToast } from "@/components/ui/toast";
 import type {
   AffiliateFilters,
   AffiliateInput,
+  AffiliateUserInput,
   BusinessInput,
   BusinessUserInput,
   CommissionFilters,
@@ -130,6 +131,34 @@ export function useMyPixMutation() {
     },
     onError: (e: Error) => toast.error("Falha ao atualizar chave PIX", e.message),
   });
+}
+
+/** Acesso do afiliado: criar login novo ou vincular conta existente. */
+export function useAffiliateUserMutation() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["affiliates"] });
+
+  const create = useMutation({
+    mutationFn: (input: AffiliateUserInput) => boCoupons.createAffiliateUser(input),
+    onSuccess: (r) => {
+      toast.success("Acesso criado", r.email);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error("Falha ao criar acesso", e.message),
+  });
+
+  const link = useMutation({
+    mutationFn: ({ affiliateId, email }: { affiliateId: string; email: string }) =>
+      boCoupons.linkAffiliateUser(affiliateId, email),
+    onSuccess: (r) => {
+      toast.success("Conta vinculada", r.email);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error("Falha ao vincular conta", e.message),
+  });
+
+  return { create, link };
 }
 
 export function useBusinessUserMutation() {

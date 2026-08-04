@@ -282,6 +282,13 @@ export interface BusinessUserInput {
   password: string;
 }
 
+/** Acesso do afiliado: senha só no modo "criar conta nova". */
+export interface AffiliateUserInput {
+  affiliate_id: string;
+  email: string;
+  password?: string;
+}
+
 /** Cupom do afiliado com o link de divulgação pronto. */
 export interface MyCoupon {
   id: string;
