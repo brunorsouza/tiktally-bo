@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { RefreshCw, RotateCw, Mail, FileDown, FileCode } from "lucide-react";
+import { RefreshCw, RotateCw, Mail, FileDown, FileCode, Ban } from "lucide-react";
+import { Dialog } from "@/components/ui/dialog";
+import { Field } from "@/components/ds";
 import { useInvoice, useInvoiceActions } from "@/hooks/useBoFiscal";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +24,7 @@ export function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading, error } = useInvoice(id);
   const actions = useInvoiceActions(id ?? "");
+  const [cancelando, setCancelando] = useState(false);
 
   if (isLoading)
     return (
@@ -97,10 +101,34 @@ export function InvoiceDetailPage() {
               >
                 <Mail /> Reenviar e-mail
               </Button>
+              {/* Cancelar é destrutivo e tem prazo legal: fica por último e em
+                  `danger`, longe do DANFE, que é o botão vizinho mais clicado. */}
+              <Button variant="danger" size="sm" onClick={() => setCancelando(true)}>
+                <Ban /> Cancelar NF-e
+              </Button>
             </>
           )}
         </div>
       </header>
+
+      {cancelando && (
+        <CancelarNfe
+          numero={inv.nfe_number}
+          emitidaEm={inv.issued_at}
+          pendente={actions.cancelInvoice.isPending}
+          onClose={() => setCancelando(false)}
+          onConfirm={(reason) =>
+            actions.cancelInvoice.mutate(reason, { onSuccess: () => setCancelando(false) })
+          }
+        />
+      )}
+
+      {inv.status === "cancelled" && inv.cancel_reason && (
+        <Note tone="warning">
+          <p className="t-overline">Justificativa do cancelamento</p>
+          <p className="mt-1 text-[0.8125rem] text-strong">{inv.cancel_reason}</p>
+        </Note>
+      )}
 
       {isRejected && inv.error_message && (
         <Note tone="warning" className="border-l-danger">
@@ -156,5 +184,92 @@ export function InvoiceDetailPage() {
         <CodeBlock value={inv.spedy_response} />
       </Panel>
     </div>
+  );
+}
+
+/** Mínimo da SEFAZ para o campo `xJust` do evento de cancelamento. */
+const JUSTIFICATIVA_MIN = 15;
+const JUSTIFICATIVA_MAX = 255;
+
+/**
+ * Confirmação do cancelamento, com a justificativa que vai pra SEFAZ.
+ *
+ * O contador de caracteres é obrigatório aqui, não enfeite: abaixo de 15 a
+ * SEFAZ recusa o evento, e essa recusa chega assíncrona, minutos depois, longe
+ * de quem escreveu. Melhor barrar com o número na frente.
+ */
+function CancelarNfe({
+  numero,
+  emitidaEm,
+  pendente,
+  onConfirm,
+  onClose,
+}: {
+  numero: string | null;
+  emitidaEm: string | null;
+  pendente: boolean;
+  onConfirm: (reason: string) => void;
+  onClose: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const texto = reason.trim();
+  const curto = texto.length < JUSTIFICATIVA_MIN;
+  const longo = texto.length > JUSTIFICATIVA_MAX;
+
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title={`Cancelar NF-e ${numero ? `nº ${numero}` : ""}`}
+      className="max-w-[32rem]"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={pendente}>
+            Voltar
+          </Button>
+          <Button
+            variant="danger"
+            loading={pendente}
+            disabled={curto || longo}
+            onClick={() => onConfirm(texto)}
+          >
+            Cancelar NF-e
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <p className="t-body leading-relaxed">
+          O cancelamento é registrado na SEFAZ e a justificativa fica no evento, junto da nota.
+          Depois de confirmado não há como desfazer: a numeração continua consumida e uma nova venda
+          exige uma nova nota.
+        </p>
+        <Note tone="warning">
+          O prazo legal varia por estado, e costuma ser curto{" "}
+          {emitidaEm ? `(esta foi emitida em ${formatDateTime(emitidaEm)})` : ""}. Fora do prazo, a
+          SEFAZ recusa e o caminho passa a ser nota de devolução.
+        </Note>
+        <Field
+          label="Justificativa"
+          hint={
+            longo
+              ? `${texto.length} caracteres — o máximo é ${JUSTIFICATIVA_MAX}.`
+              : curto
+                ? `${texto.length} de ${JUSTIFICATIVA_MIN} caracteres mínimos exigidos pela SEFAZ.`
+                : `${texto.length} caracteres.`
+          }
+          error={longo ? "Justificativa longa demais." : undefined}
+        >
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+            autoFocus
+            placeholder="Ex.: Pedido cancelado pelo comprador antes do envio da mercadoria"
+            className="w-full rounded-md border border-line bg-surface-2 px-3 py-2 text-[0.8125rem] text-strong outline-none focus:border-brand"
+          />
+        </Field>
+      </div>
+    </Dialog>
   );
 }

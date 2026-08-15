@@ -12,6 +12,17 @@ import type {
   BoSeller,
   SpedyWebhook,
   InvoiceStatus,
+  SpedyCompany,
+  SpedyCompanySettings,
+  SpedyCompanyLinkResult,
+  BoAccount,
+  BoPlan,
+  SetAccountPlanResult,
+  NewAccountInput,
+  CreateAccountResult,
+  SpedyEnvironmentsMap,
+  SetAccountEnvironmentResult,
+  SpedyEnvironmentType,
 } from "@/types";
 
 const delay = <T>(value: T, ms = 250): Promise<T> =>
@@ -258,6 +269,13 @@ export const mockBoFiscal = {
     return delay({ ...inv, status: "processing", error_message: null });
   },
 
+  cancelInvoice: (id: string, reason: string) => {
+    const inv = INVOICES.find((i) => i.id === id) ?? INVOICES[0];
+    // Fica em processing como na vida real: o 200 da Spedy é aceite, não
+    // confirmação da SEFAZ.
+    return delay({ ...inv, status: "processing", cancel_reason: reason, spedy_status: null });
+  },
+
   resendEmail: (_id: string) => delay({ ok: true }),
 
   getDocumentUrls: (_id: string) =>
@@ -270,4 +288,250 @@ export const mockBoFiscal = {
     ]),
 
   setWebhook: (_id: string, _enabled: boolean) => delay({ ok: true }),
+
+  /* ── Empresas ─────────────────────────────────────────────────────────
+     O ambiente vive num `let` de módulo pra que trocar no preview realmente
+     mude o que a tela lê depois. Sem isso o botão parece quebrado. */
+
+  listCompanies: (sandbox: boolean, cnpj?: string) => {
+    const todas = MOCK_COMPANIES;
+    const alvo = (cnpj ?? "").replace(/\D/g, "");
+    return delay({
+      sandbox,
+      total: todas.length,
+      companies: alvo
+        ? todas.filter((c) => (c.federalTaxNumber ?? "").replace(/\D/g, "") === alvo)
+        : todas,
+    });
+  },
+
+  getCompany: (companyId: string, sandbox: boolean) =>
+    delay({
+      sandbox,
+      company: MOCK_COMPANIES.find((c) => c.id === companyId) ?? MOCK_COMPANIES[0],
+    }),
+
+  getCompanySettings: (companyId: string, sandbox: boolean) =>
+    delay(mockSettings(companyId, sandbox)),
+
+  setCompanyEnvironment: (
+    companyId: string,
+    sandbox: boolean,
+    environmentType: SpedyEnvironmentType
+  ) => {
+    MOCK_ENVIRONMENTS[companyId] = environmentType;
+    return delay({ sandbox, enviado: { productInvoice: { environmentType } }, resposta: null });
+  },
+
+  listCompanyCertificates: (_companyId: string, sandbox: boolean) =>
+    delay({
+      sandbox,
+      certificates: [{ id: "cert_1", isActive: true, expirationAt: "2026-12-02T00:00:00Z" }],
+    }),
+
+  setAccountEnvironment: (
+    userId: string,
+    environmentType: SpedyEnvironmentType
+  ): Promise<SetAccountEnvironmentResult> => {
+    MOCK_ACCOUNT_ENVS[userId] = environmentType;
+    const conta = SELLERS.find((s) => s.user_id === userId);
+    const companyId = conta?.spedy_company_id ?? null;
+    if (companyId) MOCK_ENVIRONMENTS[companyId] = environmentType;
+    return delay({
+      saved: true,
+      applied: !!companyId,
+      reason: companyId ? undefined : ("sem_empresa" as const),
+      environment: environmentType,
+      company_id: companyId ?? undefined,
+    });
+  },
+
+  listAccounts: (): Promise<BoAccount[]> =>
+    delay(
+      (SELLERS.map((s, i) => ({
+        user_id: s.user_id,
+        email: s.email,
+        created_at: s.created_at,
+        shop_name: s.shop_name,
+        plan: i === 0 ? "erp" : "pro",
+        status: "active",
+        spedy_enabled: true,
+        spedy_environment: MOCK_ACCOUNT_ENVS[s.user_id] ?? null,
+        cnpj: s.cnpj,
+        razao_social: s.razao_social,
+        spedy_company_id: s.spedy_company_id,
+        spedy_active: s.spedy_active,
+        spedy_use_sandbox: s.spedy_use_sandbox,
+        emission_mode: s.emission_mode,
+        certificate_expires_at: s.certificate_expires_at,
+        // Datas variadas de propósito: vencida, vencendo e longe. É o que
+        // exercita os três tons da coluna de renovação.
+        current_period_end: iso(i === 1 ? 2 : -(10 + i * 60)),
+        cancel_at_period_end: false,
+        gateway_managed: i % 2 === 0,
+      })) as BoAccount[]).concat([
+        // Conta SEM cadastro fiscal: é o caso que o `list_sellers` não mostra.
+        {
+          user_id: "s9",
+          email: "loja.nova@gmail.com",
+          created_at: iso(3),
+          shop_name: "Loja Nova",
+          // Conta sem plano: `tiktally` + cancelada é o estado de quem se
+          // cadastrou e ainda não pagou.
+          plan: "tiktally",
+          status: "cancelled",
+          spedy_enabled: true,
+          spedy_environment: MOCK_ACCOUNT_ENVS["s9"] ?? null,
+          cnpj: null,
+          razao_social: null,
+          spedy_company_id: null,
+          spedy_active: null,
+          spedy_use_sandbox: false,
+          emission_mode: null,
+          certificate_expires_at: null,
+          current_period_end: null,
+          cancel_at_period_end: false,
+          gateway_managed: false,
+        },
+      ])
+    ),
+
+  /**
+   * Só o caminho feliz — os erros que importam (e-mail repetido, dígito
+   * inválido) são do servidor, e reproduzi-los aqui só ensinaria a tela a
+   * confiar num julgamento que em produção ela não faz.
+   */
+  createAccount: (input: NewAccountInput): Promise<CreateAccountResult> =>
+    delay({
+      user_id: `novo-${input.email}`,
+      email: input.email,
+      cnpj_duplicado: false,
+      perfil_gravado: true,
+      plan: input.plan ?? "tiktally",
+      subscription_status: input.plan ? "active" : "cancelled",
+      current_period_end: input.plan ? input.periodEnd ?? null : null,
+    }),
+
+  listPlans: (): Promise<BoPlan[]> =>
+    delay([
+      { key: "pro", name: "TikTally Pro", description: null, status: "active", sort_order: 1 },
+      { key: "erp", name: "TikTally ERP", description: null, status: "active", sort_order: 2 },
+      { key: "test", name: "TikTally Teste (R$10)", description: null, status: "test", sort_order: 99 },
+    ]),
+
+  setAccountPlan: (
+    userId: string,
+    plan: string | null,
+    periodEnd: string | null
+  ): Promise<SetAccountPlanResult> =>
+    delay({
+      user_id: userId,
+      plan,
+      status: plan ? "active" : "cancelled",
+      current_period_end: plan ? periodEnd : null,
+      gateway_managed: false,
+    }),
+
+  companiesEnvironments: (companyIds: string[], sandbox: boolean): Promise<SpedyEnvironmentsMap> =>
+    delay({
+      sandbox,
+      environments: Object.fromEntries(
+        companyIds.map((id) => [
+          id,
+          { environmentType: MOCK_ENVIRONMENTS[id] ?? "production", series: "1", erro: null },
+        ])
+      ),
+    }),
+
+  deleteCompany: (companyId: string, sandbox: boolean, _confirmCnpj: string) =>
+    delay({
+      deleted: true,
+      sandbox,
+      company_id: companyId,
+      alreadyGone: false,
+      sellers_limpos: companyId === "cmp_aurora" ? ["s1"] : [],
+    }),
+
+  linkCompany: (
+    _userId: string,
+    opts: { sandbox?: boolean; cnpj?: string; dryRun?: boolean } = {}
+  ): Promise<SpedyCompanyLinkResult> =>
+    delay({
+      linked: !opts.dryRun,
+      sandbox: !!opts.sandbox,
+      company: MOCK_COMPANIES[0],
+    }),
 };
+
+/**
+ * Uma empresa VINCULADA (o id bate com `spedy_company_id` do seller Aurora) e
+ * uma ÓRFÃ. As duas precisam existir: se todo mock aparecesse sem vínculo, o
+ * preview ensinaria errado justamente a coluna que a tela existe pra mostrar.
+ */
+const MOCK_COMPANIES: SpedyCompany[] = [
+  {
+    id: "cmp_aurora",
+    name: "Aurora Cosméticos",
+    legalName: "Aurora Comércio de Cosméticos Ltda",
+    federalTaxNumber: "41234567000190",
+    email: "fiscal@auroracosmeticos.com.br",
+    phone: null,
+    mobilePhone: null,
+    address: null,
+  },
+  {
+    id: "f37d2424-fc56-45d3-85fd-b4a60136865b",
+    name: "Loja Demo",
+    legalName: "Loja Demo Comercio LTDA",
+    federalTaxNumber: "12345678000199",
+    email: "fiscal@lojademo.com.br",
+    phone: null,
+    mobilePhone: null,
+    address: null,
+  },
+];
+
+const MOCK_ENVIRONMENTS: Record<string, SpedyEnvironmentType> = {};
+
+/** Escolha por CONTA, que existe mesmo sem empresa. */
+const MOCK_ACCOUNT_ENVS: Record<string, SpedyEnvironmentType> = {};
+
+function mockSettings(companyId: string, sandbox: boolean): SpedyCompanySettings {
+  return {
+    sandbox,
+    general: {
+      allowDuplicateFederalTaxNumbers: false,
+      allowNaturalPersonCompany: false,
+      allowMultipleInvoiceModelsPerOrder: false,
+      decimalPrecision: 2,
+      taxReformFieldsEnabled: false,
+      technicalResponsible: null,
+    },
+    productInvoice: {
+      series: "1",
+      environmentType: MOCK_ENVIRONMENTS[companyId] ?? "production",
+      nextNumber: 1,
+      danfePrintLayout: "default",
+      inbound: null,
+    },
+    consumerInvoice: {
+      series: null,
+      environmentType: null,
+      nextNumber: null,
+      tokenId: null,
+      csc: null,
+      allowOfflineContingency: false,
+    },
+    serviceInvoice: {
+      series: null,
+      environmentType: null,
+      issueType: null,
+      userName: null,
+      password: null,
+      nextBatchNumber: null,
+      authNumber: null,
+      nextNumber: null,
+      sendCityTaxNumber: null,
+    },
+  };
+}

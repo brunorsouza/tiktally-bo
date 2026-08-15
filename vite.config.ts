@@ -10,7 +10,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 8090,
+    port: process.env.PORT ? Number(process.env.PORT) : 8090,
     host: true,
   },
 });

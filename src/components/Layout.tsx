@@ -59,6 +59,8 @@ const adminSections: NavSection[] = [
       { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
       { to: "/invoices", label: "Notas (NF-e)", icon: FileText },
       { to: "/sellers", label: "Sellers", icon: Store },
+      { to: "/accounts", label: "Contas e ambiente", icon: Users },
+      { to: "/companies", label: "Empresas (Spedy)", icon: Building2 },
       { to: "/webhooks", label: "Webhooks", icon: Webhook },
     ],
   },

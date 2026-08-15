@@ -5,7 +5,15 @@
       "name": "backoffice",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 8090
+      "port": 8090,
+      "autoPort": true
+    },
+    {
+      "name": "erp",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/gabrieloliveira/Documents/tiktok-shop-tally", "run", "dev"],
+      "port": 8080,
+      "autoPort": true
     }
   ]
 }

@@ -85,7 +85,27 @@ export function useInvoiceActions(invoiceId: string) {
     onError: (e: Error) => toast.error("Falha ao abrir documento", e.message),
   });
 
-  return { checkStatus, reprocess, resendEmail, openDocument };
+  /**
+   * Cancelamento. Some da tela quando a nota não está autorizada — só nota que
+   * existe na SEFAZ pode ser cancelada.
+   *
+   * O aviso de sucesso NÃO diz "cancelada": a Spedy responde 200 ao ACEITAR o
+   * pedido, e quem cancela é a SEFAZ, de forma assíncrona. Quem confirma é o
+   * `cron-nfe-status`, que relê o status e grava o desfecho.
+   */
+  const cancelInvoice = useMutation({
+    mutationFn: (reason: string) => boFiscal.cancelInvoice(invoiceId, reason),
+    onSuccess: () => {
+      toast.success(
+        "Cancelamento enviado",
+        "A SEFAZ confirma em alguns minutos. O status é atualizado sozinho quando ela responder.",
+      );
+      invalidate();
+    },
+    onError: (e: Error) => toast.error("Falha ao cancelar", e.message),
+  });
+
+  return { checkStatus, reprocess, resendEmail, openDocument, cancelInvoice };
 }
 
 export function useWebhookToggle() {

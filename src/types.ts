@@ -43,6 +43,8 @@ export interface BoInvoice {
   error_message: string | null;
   issued_at: string | null;
   cancelled_at: string | null;
+  /** Justificativa enviada à SEFAZ no cancelamento (15 a 255 caracteres). */
+  cancel_reason?: string | null;
   created_at: string | null;
   updated_at: string | null;
   seller?: SellerRef;
@@ -483,4 +485,191 @@ export interface PaginatedCommissions {
   page: number;
   pageSize: number;
   totalPages: number;
+}
+
+/* ── Empresas na Spedy ────────────────────────────────────────────────────
+   Escopo de CONTA: quem gerencia empresa é a chave da empresa titular. E
+   sandbox e produção são contas SEPARADAS — a mesma empresa não existe nas
+   duas, por isso todo retorno carrega de qual base ele veio. */
+
+export interface SpedyCompany {
+  id: string | null;
+  name: string | null;
+  legalName: string | null;
+  /** CNPJ sem máscara, como a Spedy devolve. */
+  federalTaxNumber: string | null;
+  email: string | null;
+  phone: string | null;
+  mobilePhone: string | null;
+  address: Record<string, unknown> | null;
+}
+
+export interface SpedyCompanyList {
+  sandbox: boolean;
+  /** Total varrido na conta, antes do filtro por CNPJ. */
+  total: number;
+  companies: SpedyCompany[];
+}
+
+/** production = SEFAZ real. development = homologação. simulation = simulada. */
+export type SpedyEnvironmentType = "production" | "development" | "simulation";
+
+export interface SpedyCompanySettings {
+  sandbox: boolean;
+  general: {
+    allowDuplicateFederalTaxNumbers: boolean | null;
+    allowNaturalPersonCompany: boolean | null;
+    allowMultipleInvoiceModelsPerOrder: boolean | null;
+    decimalPrecision: number | null;
+    taxReformFieldsEnabled: boolean | null;
+    technicalResponsible: Record<string, unknown> | null;
+  };
+  productInvoice: {
+    series: string | null;
+    environmentType: SpedyEnvironmentType | null;
+    nextNumber: number | null;
+    danfePrintLayout: string | null;
+    inbound: Record<string, unknown> | null;
+  };
+  consumerInvoice: {
+    series: string | null;
+    environmentType: SpedyEnvironmentType | null;
+    nextNumber: number | null;
+    tokenId: string | null;
+    csc: string | null;
+    allowOfflineContingency: boolean | null;
+  };
+  serviceInvoice: {
+    series: string | null;
+    environmentType: SpedyEnvironmentType | null;
+    issueType: string | null;
+    userName: string | null;
+    password: string | null;
+    nextBatchNumber: number | null;
+    authNumber: string | null;
+    nextNumber: number | null;
+    sendCityTaxNumber: string | null;
+  };
+}
+
+export interface SpedyCertificate {
+  id: string | null;
+  isActive: boolean | null;
+  expirationAt: string | null;
+  [k: string]: unknown;
+}
+
+export interface SpedyCompanyLinkResult {
+  linked: boolean;
+  sandbox: boolean;
+  reason?: "not_found" | "ambiguous" | "dry_run";
+  cnpj?: string;
+  company?: SpedyCompany;
+  companies?: SpedyCompany[];
+  aviso?: string;
+}
+
+export interface DeleteCompanyResult {
+  deleted: boolean;
+  sandbox: boolean;
+  company_id: string;
+  /** Já não existia na Spedy: o vínculo local foi limpo mesmo assim. */
+  alreadyGone: boolean;
+  /** Sellers cujo cadastro fiscal voltou ao estado inicial. */
+  sellers_limpos: string[];
+}
+
+/** Uma conta do sistema com o estado fiscal dela. Ver `list_accounts`. */
+export interface BoAccount {
+  user_id: string;
+  email: string | null;
+  created_at: string | null;
+  shop_name: string | null;
+  plan: string | null;
+  status: string | null;
+  spedy_enabled: boolean | null;
+  /** Escolha do painel. null = ninguém escolheu (empresa nasce em produção). */
+  spedy_environment: SpedyEnvironmentType | null;
+  cnpj: string | null;
+  razao_social: string | null;
+  spedy_company_id: string | null;
+  spedy_active: boolean | null;
+  spedy_use_sandbox: boolean;
+  emission_mode: string | null;
+  certificate_expires_at: string | null;
+  /** Fim do período pago/concedido — a "próxima renovação". */
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  /** Assinatura dirigida pela Asaas (recorrência ou cartão salvo). */
+  gateway_managed: boolean;
+}
+
+/** Plano do catálogo (`plans`), filtrado pelo que a CHECK do banco aceita. */
+export interface BoPlan {
+  key: string;
+  name: string;
+  description: string | null;
+  status: string | null;
+  sort_order: number | null;
+}
+
+export interface SetAccountPlanResult {
+  user_id: string;
+  /** `null` = ficou sem plano (assinatura cancelada). */
+  plan: string | null;
+  status: string;
+  current_period_end: string | null;
+  gateway_managed: boolean;
+}
+
+/** Cadastro de uma conta do TikTally pelo backoffice. */
+export interface NewAccountInput {
+  email: string;
+  password: string;
+  /** Só dígitos ou com máscara — o servidor normaliza e confere o dígito. */
+  cnpj: string;
+  legalName: string;
+  legalCpf: string;
+  companyName?: string | null;
+  shopName?: string | null;
+  /** `null` = entra sem plano (paywall de pé). */
+  plan?: string | null;
+  /** Até quando o acesso vale. Obrigatório quando há plano. */
+  periodEnd?: string | null;
+}
+
+export interface CreateAccountResult {
+  user_id: string;
+  email: string;
+  /** Outra conta já usa esse CNPJ. Não impede o cadastro, mas o admin precisa saber. */
+  cnpj_duplicado: boolean;
+  /** `false` = o gatilho não gravou o cadastro fiscal; a conta entrou sem CNPJ. */
+  perfil_gravado: boolean;
+  plan: string | null;
+  /** Sem plano escolhido nasce `cancelled` — o paywall segue de pé. */
+  subscription_status: string | null;
+  current_period_end: string | null;
+}
+
+/** Ambiente lido por empresa. `erro` distingue "não consegui ler" de "não tem". */
+export interface SpedyEnvironmentEntry {
+  environmentType: SpedyEnvironmentType | null;
+  series?: string | null;
+  erro: string | null;
+}
+
+export interface SpedyEnvironmentsMap {
+  sandbox: boolean;
+  environments: Record<string, SpedyEnvironmentEntry>;
+}
+
+/** Resultado de definir o ambiente de uma conta. Ver `set_account_environment`. */
+export interface SetAccountEnvironmentResult {
+  saved: boolean;
+  /** false quando não há empresa ainda, ou quando a Spedy recusou. */
+  applied: boolean;
+  reason?: "sem_empresa" | "spedy_recusou";
+  erro?: string;
+  environment: SpedyEnvironmentType;
+  company_id?: string;
 }
