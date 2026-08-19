@@ -89,6 +89,38 @@ export function useSetCompanyEnvironment() {
  * criação. Se algum seller apontava pra ela, o cadastro fiscal dele volta ao
  * zero — por isso o aviso diz quantos foram afetados, e não só "excluída".
  */
+/**
+ * Série e próxima numeração da NF-e.
+ *
+ * Operação sem volta: número pulado não se recupera e número repetido volta
+ * como rejeição 539 da SEFAZ. Por isso o aviso de sucesso diz o que passou a
+ * valer, e não um "salvo" genérico — quem mexe aqui precisa conferir.
+ */
+export function useSetCompanyNumbering() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  return useMutation({
+    mutationFn: (v: {
+      companyId: string;
+      sandbox: boolean;
+      series?: string;
+      nextNumber?: number;
+    }) => boFiscal.setCompanyNumbering(v.companyId, v.sandbox, { series: v.series, nextNumber: v.nextNumber }),
+    onSuccess: (_r, v) => {
+      const partes = [
+        v.series ? `série ${v.series}` : null,
+        v.nextNumber ? `próximo número ${v.nextNumber}` : null,
+      ].filter(Boolean);
+      toast.success(
+        "Numeração atualizada",
+        `${partes.join(" · ")}. Vale a partir da próxima emissão.`,
+      );
+      qc.invalidateQueries({ queryKey: companyKeys.settings(v.companyId, v.sandbox) });
+    },
+    onError: (e: Error) => toast.error("Falha ao gravar a numeração", e.message),
+  });
+}
+
 export function useDeleteCompany() {
   const qc = useQueryClient();
   const toast = useToast();

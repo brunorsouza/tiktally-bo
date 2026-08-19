@@ -323,6 +323,12 @@ export const mockBoFiscal = {
     return delay({ sandbox, enviado: { productInvoice: { environmentType } }, resposta: null });
   },
 
+  setCompanyNumbering: (
+    _companyId: string,
+    sandbox: boolean,
+    numbering: { series?: string; nextNumber?: number }
+  ) => delay({ sandbox, enviado: { productInvoice: numbering }, resposta: { ok: true } }),
+
   listCompanyCertificates: (_companyId: string, sandbox: boolean) =>
     delay({
       sandbox,

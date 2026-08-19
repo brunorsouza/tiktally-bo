@@ -100,6 +100,27 @@ const realBoFiscal = {
       environment_type: environmentType,
     }),
 
+  /**
+   * Série e próxima numeração da NF-e.
+   *
+   * Numeração é por CNPJ + modelo + série, e a SEFAZ não esquece: número
+   * pulado não volta, número repetido é rejeição 539. Por isso isto é uma
+   * chamada própria, e não um campo solto junto do ambiente.
+   */
+  setCompanyNumbering: (
+    companyId: string,
+    sandbox: boolean,
+    numbering: { series?: string; nextNumber?: number }
+  ) =>
+    call<{ sandbox: boolean; enviado: unknown; resposta: unknown }>("set_company_settings", {
+      company_id: companyId,
+      sandbox,
+      productInvoice: {
+        ...(numbering.series ? { series: numbering.series } : {}),
+        ...(numbering.nextNumber ? { nextNumber: numbering.nextNumber } : {}),
+      },
+    }),
+
   listCompanyCertificates: (companyId: string, sandbox: boolean) =>
     call<{ sandbox: boolean; certificates: SpedyCertificate[] }>("list_company_certificates", {
       company_id: companyId,

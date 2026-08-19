@@ -44,6 +44,7 @@ import {
   useSpedyCompanyCertificates,
   useSetCompanyEnvironment,
   useDeleteCompany,
+  useSetCompanyNumbering,
 } from "@/hooks/useSpedyCompanies";
 import type { SpedyCompany, SpedyEnvironmentType } from "@/types";
 
@@ -216,7 +217,9 @@ function DetalheEmpresa({
   const { data: certs } = useSpedyCompanyCertificates(id, sandbox);
   const trocar = useSetCompanyEnvironment();
   const excluir = useDeleteCompany();
+  const numerar = useSetCompanyNumbering();
   const [confirmando, setConfirmando] = useState(false);
+  const [numerando, setNumerando] = useState(false);
 
   const ambiente = settings?.productInvoice.environmentType ?? null;
   const cert = certs?.certificates?.find((c) => c.isActive) ?? certs?.certificates?.[0] ?? null;
@@ -239,7 +242,23 @@ function DetalheEmpresa({
         <InfoGrid cols={4}>
           <Info label="ID da empresa" value={<span className="font-mono text-[0.6875rem]">{empresa.id}</span>} />
           <Info label="Série da NF-e" value={isLoading ? "…" : settings?.productInvoice.series ?? "—"} />
-          <Info label="Próximo número" value={isLoading ? "…" : settings?.productInvoice.nextNumber ?? "—"} />
+          <Info
+            label="Próximo número"
+            value={
+              isLoading ? (
+                "…"
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setNumerando(true)}
+                  className="underline decoration-dotted underline-offset-4 hover:text-strong"
+                  title="Alterar série e numeração"
+                >
+                  {settings?.productInvoice.nextNumber ?? "—"}
+                </button>
+              )
+            }
+          />
           <Info
             label="Certificado A1"
             value={
@@ -285,6 +304,21 @@ function DetalheEmpresa({
           </Note>
         </div>
       </div>
+
+      {numerando && id && (
+        <NumeracaoNfe
+          serieAtual={settings?.productInvoice.series ?? null}
+          proximoAtual={settings?.productInvoice.nextNumber ?? null}
+          pendente={numerar.isPending}
+          onClose={() => setNumerando(false)}
+          onConfirm={(series, nextNumber) =>
+            numerar.mutate(
+              { companyId: id, sandbox, series, nextNumber },
+              { onSuccess: () => setNumerando(false) }
+            )
+          }
+        />
+      )}
 
       {confirmando && id && (
         <ExcluirEmpresa
@@ -367,6 +401,115 @@ function ExcluirEmpresa({
             autoFocus
           />
         </Field>
+      </div>
+    </Dialog>
+  );
+}
+
+/**
+ * Série e próxima numeração da NF-e.
+ *
+ * ## Por que isto não é um campo salvo no `onBlur`
+ * Numeração não tem desfazer. Número pulado fica pulado para sempre — a SEFAZ
+ * só aceita regularizar faixa não usada por INUTILIZAÇÃO, que é outro
+ * processo. E número repetido volta como rejeição 539 numa nota de pedido
+ * real. Um diálogo com confirmação explícita é o mínimo.
+ *
+ * ## Por que série e número juntos
+ * Trocar de série sem revisar o número é a armadilha: a numeração é por CNPJ +
+ * modelo + SÉRIE, então cada série tem o contador dela. Levar o número da
+ * série antiga para uma série nova queima faixa à toa; deixar o número velho
+ * numa série já usada colide. As duas decisões são uma só.
+ */
+function NumeracaoNfe({
+  serieAtual,
+  proximoAtual,
+  pendente,
+  onClose,
+  onConfirm,
+}: {
+  serieAtual: string | null;
+  proximoAtual: number | null;
+  pendente: boolean;
+  onClose: () => void;
+  onConfirm: (series: string | undefined, nextNumber: number | undefined) => void;
+}) {
+  const [serie, setSerie] = useState(serieAtual ?? "");
+  const [proximo, setProximo] = useState(proximoAtual != null ? String(proximoAtual) : "");
+
+  // 900-999 é faixa exclusiva da NF-e Avulsa (emitida pelo Fisco). Contribuinte
+  // com aplicativo próprio que tente usar leva rejeição da SEFAZ —
+  // "Processo de Emissão pelo Contribuinte incompatível com a Série da NF".
+  const serieOk = serie === "" || /^([1-9]|[1-9][0-9]|[1-8][0-9][0-9])$/.test(serie);
+  const serieReservada = /^9[0-9][0-9]$/.test(serie);
+  const proximoNum = Number(proximo);
+  const proximoOk = proximo === "" || (Number.isInteger(proximoNum) && proximoNum >= 1);
+  const mudouSerie = serie !== (serieAtual ?? "");
+  const mudou = mudouSerie || proximo !== (proximoAtual != null ? String(proximoAtual) : "");
+
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title="Numeração da NF-e"
+      description="Vale a partir da próxima emissão."
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={pendente}>
+            Cancelar
+          </Button>
+          <Button
+            variant="danger"
+            loading={pendente}
+            disabled={!mudou || !serieOk || !proximoOk}
+            onClick={() =>
+              onConfirm(
+                serie && serie !== (serieAtual ?? "") ? serie : undefined,
+                proximo ? proximoNum : undefined
+              )
+            }
+          >
+            Gravar numeração
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label="Série"
+            error={
+              serieOk
+                ? undefined
+                : serieReservada
+                  ? "900-999 é exclusiva da NF-e Avulsa — a SEFAZ recusa."
+                  : "1 a 899."
+            }
+            hint="Cada série numera separado."
+          >
+            <Input value={serie} onChange={(e) => setSerie(e.target.value)} inputMode="numeric" placeholder="1" />
+          </Field>
+          <Field
+            label="Próximo número"
+            error={proximoOk ? undefined : "Inteiro a partir de 1."}
+            hint="O número que a próxima nota vai receber."
+          >
+            <Input value={proximo} onChange={(e) => setProximo(e.target.value)} inputMode="numeric" placeholder="1" />
+          </Field>
+        </div>
+
+        {mudouSerie && (
+          <Note tone="warning">
+            Trocar de série troca de contador. Confira o próximo número: série nova começa em{" "}
+            <strong>1</strong>, e série já usada continua de onde parou — levar o número errado
+            queima faixa ou colide na SEFAZ.
+          </Note>
+        )}
+
+        <Note tone="warning">
+          Não tem desfazer. Número pulado só se regulariza por inutilização; número repetido volta
+          como <strong>rejeição 539</strong> na próxima nota.
+        </Note>
       </div>
     </Dialog>
   );

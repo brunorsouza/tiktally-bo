@@ -701,13 +701,45 @@ async function actionCompanySettingsUpdate(p: Record<string, any>) {
   if (!Object.keys(corpo).length) return fail("Nada pra alterar: mande um bloco ou environment_type");
 
   const creds = ownerSpedy(!!p.sandbox);
+
+  /**
+   * ⚠️ O PUT NÃO mescla dentro do bloco — ele SUBSTITUI o bloco inteiro, e o
+   * que não foi enviado volta pro default. Medido em 19/08/2026: um PUT com
+   * `productInvoice: { series, nextNumber }` derrubou o `environmentType` de
+   * "development" para `0`, ou seja, a empresa saiu de homologação para
+   * produção sem ninguém pedir — com auto-emit ligado, o pedido seguinte viraria
+   * NF-e real na SEFAZ. O inverso é igualmente destrutivo: trocar o ambiente
+   * apagaria série e numeração, e numeração perdida vira rejeição 539.
+   *
+   * Por isso lê-se o estado atual e mescla campo a campo antes de gravar. Se a
+   * leitura falhar, ABORTA: gravar às cegas aqui troca um erro visível por uma
+   * mudança silenciosa em ambiente de emissão fiscal.
+   */
+  const atual = await spedyFetch(
+    creds,
+    `companies/${encodeURIComponent(String(p.company_id))}/settings`
+  );
+  if (!atual.ok) {
+    return fail(
+      `Não deu pra ler as configurações atuais da empresa (HTTP ${atual.status}). ` +
+        "Gravar sem elas apagaria ambiente ou numeração — nada foi alterado.",
+      400
+    );
+  }
+
+  const mesclado: Record<string, unknown> = {};
+  for (const [bloco, valor] of Object.entries(corpo)) {
+    const base = (atual.json?.[bloco] as Record<string, unknown> | undefined) ?? {};
+    mesclado[bloco] = { ...base, ...(valor as Record<string, unknown>) };
+  }
+
   const r = await spedyFetch(
     creds,
     `companies/${encodeURIComponent(String(p.company_id))}/settings`,
-    { method: "PUT", body: JSON.stringify(corpo) }
+    { method: "PUT", body: JSON.stringify(mesclado) }
   );
   if (!r.ok) return fail(`Spedy HTTP ${r.status}: ${r.text}`, 400);
-  return ok({ sandbox: !!p.sandbox, enviado: corpo, resposta: r.json });
+  return ok({ sandbox: !!p.sandbox, enviado: mesclado, resposta: r.json });
 }
 
 /**
