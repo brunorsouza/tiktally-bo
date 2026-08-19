@@ -890,14 +890,30 @@ async function actionDeleteCompany(db: SupabaseClient, p: Record<string, any>) {
  * de Sellers.
  */
 async function actionListAccounts(db: SupabaseClient) {
-  // Uma chamada só pros e-mails. O `emailFor` faz uma por usuário, o que numa
-  // lista de contas vira uma rajada de requisições ao Auth.
-  const { data: usersData, error: usersErr } = await db.auth.admin.listUsers({
-    page: 1,
-    perPage: 1000,
-  });
-  if (usersErr) throw new Error(usersErr.message);
-  const users = usersData?.users ?? [];
+  // Em lote, não um `emailFor` por usuário — isso viraria uma rajada de
+  // requisições ao Auth a cada render da lista.
+  //
+  // E varrendo as páginas ATÉ O FIM: pedir só a primeira cortava a lista em
+  // silêncio assim que a base passasse do tamanho da página, e a tela seguiria
+  // dizendo "todas as contas do sistema" mostrando um pedaço. O teto existe
+  // como trava de loop, não como limite de produto — se ele for atingido, isso
+  // aparece no log em vez de sumir.
+  const PAGINA = 1000;
+  const MAX_PAGINAS = 20;
+  const users: any[] = [];
+  for (let page = 1; page <= MAX_PAGINAS; page++) {
+    const { data, error } = await db.auth.admin.listUsers({ page, perPage: PAGINA });
+    if (error) throw new Error(error.message);
+    const lote = data?.users ?? [];
+    users.push(...lote);
+    if (lote.length < PAGINA) break;
+    if (page === MAX_PAGINAS) {
+      console.warn(
+        `[bo-fiscal] list_accounts parou no teto de ${MAX_PAGINAS} páginas ` +
+          `(${users.length} contas). Há contas fora da lista.`
+      );
+    }
+  }
 
   const [{ data: fiscais }, { data: subs }, { data: profiles }] = await Promise.all([
     db.from("fiscal_configs").select(
@@ -1395,10 +1411,15 @@ async function actionCancelInvoice(db: SupabaseClient, p: Record<string, any>) {
     return fail(`Spedy recusou o cancelamento: ${msg}`);
   }
 
-  // A resposta já traz o ProductInvoiceDto. Se ela vier com o status final, usa;
-  // senão fica em processing pro cron confirmar.
+  // A resposta traz o ProductInvoiceDto com o status DAQUELE INSTANTE — e o
+  // cancelamento é assíncrono, então ali ele ainda é `Authorized`. Aceitar esse
+  // eco regravava "autorizada" por cima do pedido que acabou de ser aceito, e a
+  // nota ficava presa: o `cron-nfe-status` só reconcilia `processing`/`pending`,
+  // então nada nunca mais olhava pra ela. Só um `cancelled` explícito vale como
+  // desfecho; qualquer outra coisa vira `processing` pro cron confirmar.
   const statusBruto = String(res.json?.status ?? "");
-  const normalizado = statusBruto ? mapSpedyStatus(statusBruto) : "processing";
+  const normalizado: Status =
+    statusBruto && mapSpedyStatus(statusBruto) === "cancelled" ? "cancelled" : "processing";
 
   const updates: Record<string, unknown> = {
     ...extractInvoiceUpdates(res.json ?? {}, normalizado),
