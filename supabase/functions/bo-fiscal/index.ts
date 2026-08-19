@@ -555,6 +555,46 @@ function ownerSpedy(sandbox: boolean): SpedyCreds {
   return { baseUrl: sandboxBaseUrl(), apiKey, sandbox: true };
 }
 
+/**
+ * PUT em /companies/{id}/settings preservando o que não foi enviado.
+ *
+ * ⚠️ O PUT da Spedy SUBSTITUI o bloco — o que faltar volta pro default. Já
+ * causou os dois estragos possíveis em produção, em 19/08/2026:
+ *   • mandar { series, nextNumber } derrubou o environmentType pra `0`,
+ *     tirando a empresa de homologação sem ninguém pedir;
+ *   • mandar { environmentType } apagou série e numeração, e numeração
+ *     perdida volta como rejeição 539 na nota seguinte.
+ *
+ * Lê, mescla campo a campo e grava. Se a leitura falhar, NÃO grava: um erro
+ * visível é melhor que uma mudança silenciosa em ambiente de emissão fiscal.
+ */
+async function putSettingsMesclado(
+  creds: SpedyCreds,
+  companyId: string,
+  blocos: Record<string, Record<string, unknown>>
+): Promise<{ ok: boolean; status: number; text: string; json: any; enviado: Record<string, unknown> }> {
+  const path = `companies/${encodeURIComponent(companyId)}/settings`;
+  const atual = await spedyFetch(creds, path);
+  if (!atual.ok) {
+    return {
+      ok: false,
+      status: atual.status,
+      text: `não foi possível ler as configurações atuais (HTTP ${atual.status}) — nada foi alterado`,
+      json: null,
+      enviado: {},
+    };
+  }
+
+  const mesclado: Record<string, unknown> = {};
+  for (const [bloco, valor] of Object.entries(blocos)) {
+    const base = (atual.json?.[bloco] as Record<string, unknown> | undefined) ?? {};
+    mesclado[bloco] = { ...base, ...valor };
+  }
+
+  const r = await spedyFetch(creds, path, { method: "PUT", body: JSON.stringify(mesclado) });
+  return { ...r, enviado: mesclado };
+}
+
 /** Só dígitos: a Spedy devolve o CNPJ sem máscara, o nosso banco guarda com. */
 const soDigitos = (v: unknown) => String(v ?? "").replace(/\D/g, "");
 
@@ -701,45 +741,14 @@ async function actionCompanySettingsUpdate(p: Record<string, any>) {
   if (!Object.keys(corpo).length) return fail("Nada pra alterar: mande um bloco ou environment_type");
 
   const creds = ownerSpedy(!!p.sandbox);
-
-  /**
-   * ⚠️ O PUT NÃO mescla dentro do bloco — ele SUBSTITUI o bloco inteiro, e o
-   * que não foi enviado volta pro default. Medido em 19/08/2026: um PUT com
-   * `productInvoice: { series, nextNumber }` derrubou o `environmentType` de
-   * "development" para `0`, ou seja, a empresa saiu de homologação para
-   * produção sem ninguém pedir — com auto-emit ligado, o pedido seguinte viraria
-   * NF-e real na SEFAZ. O inverso é igualmente destrutivo: trocar o ambiente
-   * apagaria série e numeração, e numeração perdida vira rejeição 539.
-   *
-   * Por isso lê-se o estado atual e mescla campo a campo antes de gravar. Se a
-   * leitura falhar, ABORTA: gravar às cegas aqui troca um erro visível por uma
-   * mudança silenciosa em ambiente de emissão fiscal.
-   */
-  const atual = await spedyFetch(
+  const r = await putSettingsMesclado(
     creds,
-    `companies/${encodeURIComponent(String(p.company_id))}/settings`
+    String(p.company_id),
+    corpo as Record<string, Record<string, unknown>>
   );
-  if (!atual.ok) {
-    return fail(
-      `Não deu pra ler as configurações atuais da empresa (HTTP ${atual.status}). ` +
-        "Gravar sem elas apagaria ambiente ou numeração — nada foi alterado.",
-      400
-    );
-  }
 
-  const mesclado: Record<string, unknown> = {};
-  for (const [bloco, valor] of Object.entries(corpo)) {
-    const base = (atual.json?.[bloco] as Record<string, unknown> | undefined) ?? {};
-    mesclado[bloco] = { ...base, ...(valor as Record<string, unknown>) };
-  }
-
-  const r = await spedyFetch(
-    creds,
-    `companies/${encodeURIComponent(String(p.company_id))}/settings`,
-    { method: "PUT", body: JSON.stringify(mesclado) }
-  );
   if (!r.ok) return fail(`Spedy HTTP ${r.status}: ${r.text}`, 400);
-  return ok({ sandbox: !!p.sandbox, enviado: mesclado, resposta: r.json });
+  return ok({ sandbox: !!p.sandbox, enviado: r.enviado, resposta: r.json });
 }
 
 /**
@@ -1357,11 +1366,10 @@ async function actionSetAccountEnvironment(db: SupabaseClient, p: Record<string,
   }
 
   const creds = ownerSpedy(!!cfg?.spedy_use_sandbox);
-  const r = await spedyFetch(
-    creds,
-    `companies/${encodeURIComponent(companyId)}/settings`,
-    { method: "PUT", body: JSON.stringify({ productInvoice: { environmentType: env } }) }
-  );
+  // Mesclado: trocar o ambiente NÃO pode apagar série e numeração da empresa.
+  const r = await putSettingsMesclado(creds, companyId, {
+    productInvoice: { environmentType: env },
+  });
 
   // A escolha continua gravada mesmo se a Spedy recusar: ela vale pro próximo
   // cadastro. Mas o retorno diz que NÃO aplicou, pra tela não fingir sucesso.
