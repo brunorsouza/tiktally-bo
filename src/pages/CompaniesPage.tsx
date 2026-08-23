@@ -151,6 +151,7 @@ export function CompaniesPage() {
   return (
     <div className="space-y-5">
       <PageHeader
+        eyebrow="Fiscal"
         title="Empresas na Spedy"
         description="Empresas cadastradas na conta e o ambiente de emissão de cada uma. Produção e sandbox são contas separadas."
         meta={data && <span className="t-overline">{data.total}</span>}

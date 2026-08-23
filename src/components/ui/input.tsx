@@ -6,14 +6,16 @@ import { cn } from "@/lib/utils";
  * Controles do DS.
  *
  * DENSIDADE POR CONTEXTO — a lição de um erro anterior: densidade de tabela
- * (32px, 10px de padding) aplicada a um formulário fica claustrofóbica, porque
+ * (32px, 10px de padding) aplicada a formulário fica claustrofóbica, porque
  * ali a pessoa DIGITA e precisa de área de acerto e respiro.
  *
  *   - `md` (padrão, 36px + 12px): formulários e diálogos.
  *   - `sm` (32px + 10px): filtros de toolbar, onde o controle é secundário.
  *
- * O campo é "escavado" (fundo mais escuro que o painel) e a borda acende na
- * marca ao focar — sem anel externo, que empurra o layout.
+ * O campo é a FOLHA (a superfície mais clara do tema) com borda marcada — no
+ * papel isso lê como campo impresso de formulário; na tinta, como campo
+ * escavado. A borda acende na marca ao focar, com um anel de baixa opacidade
+ * por fora que não empurra o layout.
  */
 type Size = "sm" | "md";
 
@@ -23,13 +25,11 @@ const sizeCls: Record<Size, string> = {
 };
 
 const base =
-  // Borda marcada (não a régua fininha): o campo precisa se ler como caixa
-  // antes de a pessoa clicar nele.
-  "w-full rounded-md border border-line-strong bg-surface-1 text-strong " +
-  "transition-[border-color,background-color,box-shadow] duration-ds ease-ds " +
+  "w-full rounded-md border border-line-strong bg-surface-2 text-strong " +
+  "transition-[border-color,box-shadow] duration-ds ease-ds " +
   "placeholder:text-subtle hover:border-subtle " +
-  "focus:border-brand focus:bg-surface-2 focus:ring-1 focus:ring-brand/40 focus:outline-none focus-visible:outline-none " +
-  "disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-line-strong";
+  "focus:border-brand focus:ring-2 focus:ring-brand/25 focus:outline-none focus-visible:outline-none " +
+  "disabled:cursor-not-allowed disabled:bg-surface-2 disabled:opacity-60 disabled:hover:border-line-strong";
 
 export const Input = forwardRef<
   HTMLInputElement,
@@ -63,7 +63,7 @@ export const SearchInput = forwardRef<
   InputHTMLAttributes<HTMLInputElement> & { icon?: React.ReactNode }
 >(({ className, icon, ...props }, ref) => (
   <div className="relative flex-1">
-    <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle [&_svg]:h-3.5 [&_svg]:w-3.5">
+    <span className="pointer-events-none absolute left-2.5 top-1/2 z-10 -translate-y-1/2 text-subtle [&_svg]:h-3.5 [&_svg]:w-3.5">
       {icon}
     </span>
     <input ref={ref} className={cn(base, sizeCls.sm, "pl-8", className)} {...props} />

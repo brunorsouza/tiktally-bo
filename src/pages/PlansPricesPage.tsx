@@ -4,10 +4,19 @@ import { usePricing, usePricingMutations } from "@/hooks/useBoCoupons";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { PageHeader, Surface, Field, Note, Money, Status, Switch, ErrorState, TableSkeleton } from "@/components/ds";
+import {
+  PageHeader,
+  Fieldset,
+  Field,
+  Note,
+  Money,
+  Status,
+  Switch,
+  ErrorState,
+  TableSkeleton,
+} from "@/components/ds";
 import { DataTable, RowActions, type Column } from "@/components/ds/DataTable";
 import { CYCLE_LABELS, PLAN_LABELS, INTERNAL_PLAN_KEYS } from "@/lib/coupons";
-import { cn } from "@/lib/utils";
 import type { Price, Setting, TestPlanState } from "@/types";
 
 const CYCLE_ORDER: Record<string, number> = { yearly: 0, semiannually: 1 };
@@ -74,6 +83,7 @@ export function PlansPricesPage() {
   return (
     <div className="space-y-5">
       <PageHeader
+        eyebrow="Cupons"
         title="Planos & Preços"
         description={
           <>
@@ -129,37 +139,46 @@ function SettingsPanel({ settings }: { settings: Setting[] }) {
   };
 
   return (
-    <Surface className="p-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="t-label">Regras de desconto e comissão</p>
+    <Fieldset
+      title="Regras de desconto e comissão"
+      actions={
         <Button size="sm" onClick={save} loading={updateSetting.isPending}>
           Salvar regras
         </Button>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+      }
+    >
+      {/* Fila de quatro campos: rótulos curtos o bastante pra caber em UMA
+          linha, e ZERO dica por campo. Rótulo que quebra ou dica que só um
+          campo tem desalinham a fila inteira — a explicação do bloco mora na
+          nota abaixo, que é onde ela é lida de qualquer jeito. */}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <Field label="Desconto cupom (%)">
           <Input type="number" min={0} max={100} value={coupon} onChange={(e) => setCoupon(e.target.value)} />
         </Field>
         <Field label="Desconto PIX (%)">
           <Input type="number" min={0} max={100} value={pix} onChange={(e) => setPix(e.target.value)} />
         </Field>
-        <Field label="Carência comissão (dias)">
+        <Field label="Carência (dias)">
           <Input type="number" min={0} value={hold} onChange={(e) => setHold(e.target.value)} />
         </Field>
         <Field label="Empilhamento">
           <Select value={stacking} onChange={(e) => setStacking(e.target.value)}>
-            <option value="multiplicative">Multiplicativo (×0,80×0,95)</option>
+            <option value="multiplicative">Multiplicativo</option>
             <option value="additive">Aditivo</option>
           </Select>
         </Field>
       </div>
 
       <Note className="mt-4">
-        A carência é a janela de refund: a comissão só fica elegível depois dela. Mexer aqui muda o
-        cálculo das próximas comissões, não das já geradas.
+        A <strong className="font-medium text-strong">carência</strong> é a janela de refund: a
+        comissão só fica elegível depois dela.{" "}
+        <strong className="font-medium text-strong">Empilhamento</strong>{" "}
+        {stacking === "multiplicative"
+          ? "multiplicativo compõe os descontos (×0,80 × ×0,95 = −24%)"
+          : "aditivo soma os descontos (20% + 5% = −25%)"}
+        . Mexer aqui muda o cálculo das próximas comissões, não das já geradas.
       </Note>
-    </Surface>
+    </Fieldset>
   );
 }
 
@@ -184,29 +203,18 @@ function TestPlanPanel({ state }: { state: TestPlanState }) {
   const inerte = !state.master_enabled || semLista;
 
   return (
-    <Surface
-      className={cn(
-        "p-4",
-        state.effective ? "border-l-2 border-l-warning" : undefined
-      )}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="t-label flex items-center gap-2">
-            <FlaskConical className="h-3.5 w-3.5" />
-            Plano de teste (R$ 10)
-          </p>
-          <p className="t-caption mt-1 max-w-xl leading-relaxed">
-            Cobrança real no Asaas de produção, para validar checkout, webhook, ativação e comissão.
-            Libera as features do Pro — por isso só vale para os e-mails autorizados.
-          </p>
-        </div>
+    <Fieldset
+      accent={state.effective ? "warning" : undefined}
+      icon={<FlaskConical />}
+      title="Plano de teste (R$ 10)"
+      description="Cobrança real no Asaas de produção, para validar checkout, webhook, ativação e comissão. Libera as features do Pro — por isso só vale para os e-mails autorizados."
+      actions={
         <Status tone={state.effective ? "warning" : "neutral"}>
           {state.effective ? "Ativo" : "Desativado"}
         </Status>
-      </div>
-
-      <div className="mt-4">
+      }
+    >
+      <div>
         <Switch
           tone="danger"
           checked={state.setting_enabled}
@@ -244,7 +252,7 @@ function TestPlanPanel({ state }: { state: TestPlanState }) {
         <strong className="text-strong">quem pode usar</strong> exige os secrets no Supabase — de
         propósito, para que um acesso ao backoffice não consiga ampliar quem compra Pro por R$ 10.
       </Note>
-    </Surface>
+    </Fieldset>
   );
 }
 

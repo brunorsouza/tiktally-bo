@@ -1,21 +1,23 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Search, FlaskConical, X, FileText } from "lucide-react";
-import { useInvoices } from "@/hooks/useBoFiscal";
-import { Select, SearchInput } from "@/components/ui/input";
-import { PageHeader, Toolbar, Money, Pagination } from "@/components/ds";
+import { useInvoices, useMetrics } from "@/hooks/useBoFiscal";
+import { SearchInput } from "@/components/ui/input";
+import { PageHeader, Money, Pagination, StatusChips } from "@/components/ds";
 import { DataTable, CellStack, type Column } from "@/components/ds/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDateTime, formatCnpj } from "@/lib/formatters";
 import type { BoInvoice, InvoiceStatus } from "@/types";
 
-const STATUSES: { value: InvoiceStatus | ""; label: string }[] = [
-  { value: "", label: "Todos os status" },
-  { value: "authorized", label: "Autorizadas" },
-  { value: "rejected", label: "Rejeitadas" },
-  { value: "processing", label: "Processando" },
-  { value: "pending", label: "Pendentes" },
-  { value: "cancelled", label: "Canceladas" },
+type Tom = "neutral" | "success" | "warning" | "danger" | "info";
+
+const STATUSES: { value: InvoiceStatus | ""; label: string; tone?: Tom }[] = [
+  { value: "", label: "Todas" },
+  { value: "authorized", label: "Autorizadas", tone: "success" },
+  { value: "rejected", label: "Rejeitadas", tone: "danger" },
+  { value: "processing", label: "Processando", tone: "info" },
+  { value: "pending", label: "Pendentes", tone: "warning" },
+  { value: "cancelled", label: "Canceladas", tone: "neutral" },
 ];
 
 export function InvoicesPage() {
@@ -24,8 +26,27 @@ export function InvoicesPage() {
   const userId = searchParams.get("user") || undefined;
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [status, setStatus] = useState<InvoiceStatus | "">("");
   const [page, setPage] = useState(1);
+
+  /**
+   * O status mora na URL, não em `useState`.
+   *
+   * É o que permite o painel lateral apontar direto pra `/invoices?status=
+   * rejected` — um contador que não navega obriga a refazer o filtro na mão.
+   * De brinde, o filtro passa a ser compartilhável e a sobreviver ao voltar
+   * do navegador.
+   */
+  const status = (searchParams.get("status") ?? "") as InvoiceStatus | "";
+  const setStatus = (v: InvoiceStatus | "") => {
+    if (v) searchParams.set("status", v);
+    else searchParams.delete("status");
+    setSearchParams(searchParams, { replace: true });
+    setPage(1);
+  };
+
+  // Contagem por estado: o mesmo `metrics` que alimenta o painel lateral, então
+  // as abas não custam uma requisição a mais.
+  const { data: metrics } = useMetrics();
 
   const { data, isLoading, isFetching, error } = useInvoices({
     page,
@@ -98,6 +119,7 @@ export function InvoicesPage() {
   return (
     <div className="space-y-5">
       <PageHeader
+        eyebrow="Fiscal"
         title="Notas fiscais"
         description="Todas as NF-e de todos os sellers. Clique numa linha para abrir e operar."
         meta={
@@ -113,58 +135,56 @@ export function InvoicesPage() {
         }
       />
 
-      <Toolbar>
-        <form onSubmit={submitSearch} className="flex min-w-[18rem] flex-1">
-          <SearchInput
-            icon={<Search />}
-            placeholder="Buscar por CNPJ, nº NF, pedido, comprador…"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
-        </form>
-        <Select
-          selectSize="sm"
-          className="w-48"
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value as InvoiceStatus | "");
-            setPage(1);
-          }}
-        >
-          {STATUSES.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </Select>
-      </Toolbar>
+      <StatusChips
+        value={status}
+        onChange={setStatus}
+        options={STATUSES.map((s) => ({
+          value: s.value,
+          label: s.label,
+          tone: s.tone,
+          count: !metrics
+            ? undefined
+            : s.value === ""
+              ? metrics.total
+              : metrics.by_status[s.value],
+        }))}
+      />
 
-      <div className="space-y-3">
-        <DataTable
-          rows={data?.items}
-          rowKey={(inv) => inv.id}
-          loading={isLoading}
-          error={error ? (error as Error).message : null}
-          onRowClick={(inv) => navigate(`/invoices/${inv.id}`)}
-          empty={{
-            title: "Nenhuma nota encontrada",
-            description: search || status ? "Tente afrouxar os filtros." : "Ainda não há NF-e emitidas.",
-            icon: <FileText />,
-          }}
-          columns={colunas}
-        />
-
-        {data && data.items.length > 0 && (
-          <Pagination
-            page={page}
-            totalPages={data.totalPages}
-            total={data.total}
-            unit="notas"
-            fetching={isFetching}
-            onPage={setPage}
-          />
-        )}
-      </div>
+      <DataTable
+        toolbar={
+          <form onSubmit={submitSearch} className="flex min-w-[16rem] flex-1">
+            <SearchInput
+              icon={<Search />}
+              placeholder="Buscar por CNPJ, nº NF, pedido, comprador…"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </form>
+        }
+        rows={data?.items}
+        rowKey={(inv) => inv.id}
+        loading={isLoading}
+        error={error ? (error as Error).message : null}
+        onRowClick={(inv) => navigate(`/invoices/${inv.id}`)}
+        empty={{
+          title: "Nenhuma nota encontrada",
+          description: search || status ? "Tente afrouxar os filtros." : "Ainda não há NF-e emitidas.",
+          icon: <FileText />,
+        }}
+        columns={colunas}
+        footer={
+          data && data.items.length > 0 ? (
+            <Pagination
+              page={page}
+              totalPages={data.totalPages}
+              total={data.total}
+              unit="notas"
+              fetching={isFetching}
+              onPage={setPage}
+            />
+          ) : undefined
+        }
+      />
     </div>
   );
 }

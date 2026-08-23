@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { useMetrics } from "@/hooks/useBoFiscal";
 import {
   PageHeader,
@@ -9,32 +8,61 @@ import {
   EmptyState,
   ErrorState,
   Skeleton,
+  ColumnChart,
+  ChartLegend,
 } from "@/components/ds";
-import { formatRelative } from "@/lib/formatters";
+
+/**
+ * Resumo em linha.
+ *
+ * Os números de contexto (pendentes, canceladas, sellers) não merecem o mesmo
+ * corpo dos quatro primeiros — se tudo é métrica grande, nada é. Aqui eles
+ * viram a linha de fechamento do documento: rótulo, valor, régua entre um e
+ * outro.
+ */
+function ResumoLinha({ itens }: { itens: { label: string; value: React.ReactNode; hint?: string }[] }) {
+  return (
+    <div className="flex flex-wrap items-stretch gap-y-4 rounded-lg border border-line bg-surface-1 px-6 py-4 shadow-2">
+      {itens.map((it, i) => (
+        <div key={it.label} className={i === 0 ? "pr-8" : "border-l border-line pl-8 pr-8"}>
+          <p className="t-overline">{it.label}</p>
+          <p className="mt-1.5 flex items-baseline gap-2">
+            <span className="tabular text-[0.9375rem] font-medium text-strong">{it.value}</span>
+            {it.hint && <span className="t-caption">{it.hint}</span>}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function DashboardPage() {
   const { data, isLoading, error } = useMetrics();
 
   if (isLoading)
     return (
-      <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <Skeleton key={i} className="h-16" />
-        ))}
+      <div className="space-y-8">
+        <Skeleton className="h-10 w-64" />
+        <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-16" />
+          ))}
+        </div>
+        <Skeleton className="h-40" />
       </div>
     );
   if (error) return <ErrorState message={(error as Error).message} />;
   if (!data) return null;
 
-  const maxDay = Math.max(1, ...data.by_day.map((d) => d.total));
-
   return (
-    <div className="space-y-7">
+    <div className="space-y-8">
       <PageHeader
-        title="Dashboard fiscal"
+        eyebrow="Fiscal"
+        title="Dashboard"
         description="Visão consolidada de todas as NF-e emitidas pelos sellers via Spedy."
       />
 
+      {/* Os quatro que importam. O resto é contexto e vai na linha de baixo. */}
       <StatGrid>
         <Stat label="Total de notas" value={data.total} />
         <Stat
@@ -52,73 +80,56 @@ export function DashboardPage() {
         <Stat label="Processando" value={data.by_status.processing} tone="brand" />
       </StatGrid>
 
-      <StatGrid>
-        <Stat label="Pendentes" value={data.by_status.pending} tone="warning" />
-        <Stat label="Canceladas" value={data.by_status.cancelled} />
-        <Stat label="Sellers c/ config" value={data.sellers_with_config} hint={`${data.sellers_active} ativos`} />
-        <Stat
-          label="Em sandbox"
-          value={data.sellers_sandbox}
-          hint="config de homologação"
-          tone={data.sellers_sandbox > 0 ? "warning" : "default"}
-        />
-      </StatGrid>
+      <ResumoLinha
+        itens={[
+          { label: "Pendentes", value: data.by_status.pending },
+          { label: "Canceladas", value: data.by_status.cancelled },
+          { label: "Sellers c/ config", value: data.sellers_with_config, hint: `${data.sellers_active} ativos` },
+          { label: "Em sandbox", value: data.sellers_sandbox, hint: "homologação" },
+        ]}
+      />
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Panel title="Emissões · últimos 30 dias">
-          {data.by_day.length === 0 ? (
-            <EmptyState title="Sem emissões no período" />
-          ) : (
-            <div className="space-y-1">
-              {data.by_day.map((d) => (
-                <div key={d.day} className="flex items-center gap-3 text-[0.6875rem]">
-                  <span className="w-11 shrink-0 font-mono text-subtle">{d.day.slice(5)}</span>
-                  {/* Barra empilhada: verde autorizado, vermelho rejeitado, resto é o trilho */}
-                  <div className="flex h-3 flex-1 overflow-hidden rounded-[2px] bg-surface-2">
-                    <div
-                      className="bg-success"
-                      style={{ width: `${(d.authorized / maxDay) * 100}%` }}
-                      title={`${d.authorized} autorizadas`}
-                    />
-                    <div
-                      className="bg-danger"
-                      style={{ width: `${(d.rejected / maxDay) * 100}%` }}
-                      title={`${d.rejected} rejeitadas`}
-                    />
-                  </div>
-                  <span className="tabular w-7 shrink-0 text-right text-subtle">{d.total}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </Panel>
+      {/*
+        As "rejeições recentes" saíram daqui: elas viraram fila de trabalho no
+        painel lateral, visível em TODA tela em vez de só nesta. Repetir a lista
+        nos dois lugares não é redundância inofensiva — são dois lugares pra
+        conferir e dois pra divergir.
 
-        <Panel title="Rejeições recentes">
-          {data.recent_rejections.length === 0 ? (
-            <EmptyState title="Nenhuma rejeição recente" description="Todas as emissões do período passaram." />
-          ) : (
-            <div className="divide-y divide-line/50">
-              {data.recent_rejections.map((r) => (
-                <Link
-                  key={r.id}
-                  to={`/invoices/${r.id}`}
-                  className="block py-2.5 transition-colors duration-ds ease-ds hover:bg-surface-1"
-                >
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="truncate text-[0.8125rem] font-medium text-strong">
-                      {r.shop_name || r.emitter_name || "Seller"}
-                    </span>
-                    <span className="t-caption shrink-0 tabular">{formatRelative(r.created_at)}</span>
-                  </div>
-                  <p className="mt-0.5 line-clamp-2 text-[0.6875rem] text-danger">
-                    {r.error_message || "Rejeitada pela SEFAZ"}
-                  </p>
-                </Link>
-              ))}
-            </div>
-          )}
-        </Panel>
-      </div>
+        O que sobra no centro é o que o painel não faz: a série histórica, que
+        precisa de largura pra ser lida.
+      */}
+      <Panel title="Emissões · últimos 30 dias">
+        {data.by_day.length === 0 ? (
+          <EmptyState title="Sem emissões no período" />
+        ) : (
+          <div className="space-y-3">
+            <ColumnChart
+              height={180}
+              unit="notas"
+              data={data.by_day.map((d) => ({
+                key: d.day,
+                label: d.day.slice(5),
+                parts: [
+                  { value: d.authorized, tone: "success", label: "autorizadas" },
+                  { value: d.rejected, tone: "danger", label: "rejeitadas" },
+                  {
+                    value: Math.max(0, d.total - d.authorized - d.rejected),
+                    tone: "neutral",
+                    label: "em outros estados",
+                  },
+                ],
+              }))}
+            />
+            <ChartLegend
+              items={[
+                { tone: "success", label: "autorizadas", value: data.by_status.authorized },
+                { tone: "danger", label: "rejeitadas", value: data.by_status.rejected },
+                { tone: "neutral", label: "demais" },
+              ]}
+            />
+          </div>
+        )}
+      </Panel>
     </div>
   );
 }

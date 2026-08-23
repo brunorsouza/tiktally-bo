@@ -92,6 +92,7 @@ export function CommissionsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
+        eyebrow="Afiliados"
         title="Comissões"
         meta={data && <span className="t-overline">{data.items.length}</span>}
         description="Geradas no 1º pagamento. Ficam elegíveis após a janela de 7 dias (refund). Fluxo: aprovar → pagar → (estornar)."

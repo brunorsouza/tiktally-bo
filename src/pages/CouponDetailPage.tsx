@@ -4,8 +4,9 @@ import { useCoupon } from "@/hooks/useBoCoupons";
 import { Button } from "@/components/ui/button";
 import {
   BackLink,
+  PageHeader,
   Panel,
-  Surface,
+  Fieldset,
   InfoGrid,
   Info,
   Status,
@@ -59,15 +60,16 @@ export function CouponDetailPage() {
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <BackLink to="/coupons">Cupons</BackLink>
 
-      <header className="flex flex-wrap items-end justify-between gap-3 border-b border-line pb-3">
-        <div className="min-w-0">
-          <h1 className="font-mono text-[1.375rem] font-semibold leading-none tracking-tight text-strong">
-            {coupon.code}
-          </h1>
-          <div className="mt-2.5 flex flex-wrap items-center gap-3">
+      {/* O código É o nome do cupom — e código é DADO, então vai em mono. É a
+          única tela onde o título abre mãos da serifa, de propósito. */}
+      <PageHeader
+        eyebrow="Cupons"
+        title={coupon.code}
+        meta={
+          <>
             <CouponStatusBadge
               status={coupon.status}
               expired={coupon.expired}
@@ -75,33 +77,42 @@ export function CouponDetailPage() {
               scheduled={coupon.scheduled}
             />
             <DiscountKindBadge kind={coupon.discount_kind} />
-            {coupon.description && <span className="t-caption">{coupon.description}</span>}
-          </div>
-        </div>
-        <Button
-          variant="outline"
-          onClick={() => {
-            navigator.clipboard?.writeText(coupon.code);
-            toast.success("Código copiado");
-          }}
-        >
-          <Copy /> Copiar código
-        </Button>
-      </header>
+          </>
+        }
+        description={coupon.description}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              navigator.clipboard?.writeText(coupon.code);
+              toast.success("Código copiado");
+            }}
+          >
+            <Copy /> Copiar código
+          </Button>
+        }
+        titleClassName="tabular text-[1.375rem] font-semibold tracking-[-0.01em]"
+      />
 
-      <Surface className="p-4">
+      <Fieldset title="Condições do cupom">
         <InfoGrid>
-          <Info label="Desconto" value={discountLabel(coupon.discount_kind, coupon.discount)} />
+          <Info label="Desconto" value={discountLabel(coupon.discount_kind, coupon.discount)} mono />
           <Info
             label="Resgates"
             value={<span className={coupon.exhausted ? "text-danger" : ""}>{redeemsLabel(coupon)}</span>}
+            mono
           />
-          <Info label="Início" value={coupon.valid_from ? formatDate(coupon.valid_from) : "—"} />
-          <Info label="Validade" value={coupon.valid_until ? formatDate(coupon.valid_until) : "Sem expiração"} />
+          <Info label="Início" value={coupon.valid_from ? formatDate(coupon.valid_from) : "—"} mono />
+          <Info
+            label="Validade"
+            value={coupon.valid_until ? formatDate(coupon.valid_until) : "Sem expiração"}
+            mono={!!coupon.valid_until}
+          />
           <Info label="Aplicável a" value={appliesToLabel(coupon.applicable_plans, coupon.applicable_cycles)} />
-          <Info label="Criado" value={formatDate(coupon.created_at)} />
+          <Info label="Criado" value={formatDate(coupon.created_at)} mono />
         </InfoGrid>
-      </Surface>
+      </Fieldset>
 
       <Panel title={`Resgates · ${redemptions.length}`}>
         <DataTable

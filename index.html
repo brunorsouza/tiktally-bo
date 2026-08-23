@@ -1,10 +1,26 @@
 <!doctype html>
-<html lang="pt-BR" class="dark">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#f2f8fd" />
     <title>TikTally · Backoffice</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <script>
+      // Tema aplicado antes da primeira pintura — sem isso a tela pisca no
+      // claro e depois cai no escuro, que é o defeito clássico de dark mode.
+      // Precisa concordar com `inicial()` em src/contexts/ThemeContext.tsx:
+      // sem escolha salva, o padrão é CLARO (o backoffice foi desenhado assim).
+      (function () {
+        try {
+          if (localStorage.getItem("tiktally-bo-tema") === "tinta") {
+            document.documentElement.classList.add("dark");
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

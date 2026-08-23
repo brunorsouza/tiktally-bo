@@ -1,9 +1,10 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Tokens do Design System vivem em `src/index.css` (CSS vars) — aqui só os
- * expomos ao Tailwind. Regra: nada de cor literal (`bg-slate-800`) nas telas;
- * sempre um token, pra o tema continuar sendo uma coisa só.
+ * Os tokens vivem em `src/index.css` (CSS vars) — aqui só os expomos ao
+ * Tailwind. Regra da casa: NADA de cor literal (`bg-stone-100`) nas telas.
+ * Sempre um token, senão o tema deixa de ser uma coisa só e vira 30 coisas
+ * parecidas — que é exatamente como interface começa a parecer gerada.
  */
 export default {
   darkMode: "class",
@@ -11,7 +12,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Superfícies
+        // Superfícies: a mesa, a folha, o rebaixo, o realce
         base: "hsl(var(--surface-base))",
         surface: {
           DEFAULT: "hsl(var(--surface-1))",
@@ -19,10 +20,11 @@ export default {
           2: "hsl(var(--surface-2))",
           3: "hsl(var(--surface-3))",
         },
-        // Texto
+        // Tinta
         strong: "hsl(var(--text-strong))",
         subtle: "hsl(var(--text-muted))",
-        // Linhas
+        ink: "hsl(var(--text))",
+        // Réguas
         line: {
           DEFAULT: "hsl(var(--line))",
           strong: "hsl(var(--line-strong))",
@@ -34,7 +36,7 @@ export default {
           muted: "hsl(var(--brand-muted))",
           foreground: "hsl(var(--brand-foreground))",
         },
-        // Semânticos + superfície própria (badge não precisa de /15 no olho)
+        // Semânticos + superfície própria (chip não precisa depender de /15)
         success: {
           DEFAULT: "hsl(var(--success))",
           surface: "hsl(var(--success-surface))",
@@ -77,16 +79,17 @@ export default {
           foreground: "hsl(var(--destructive-foreground))",
         },
       },
-      // Raio moderado. O quase-zero anterior somado ao mono deixava a tela com
-      // cara de terminal; o exagero arredondado é que dá cara de template.
+      // Canto generoso: na referência é ele, junto da sombra, que dá corpo ao
+      // cartão. `pill` é o botão — totalmente arredondado.
       borderRadius: {
         sm: "0.25rem",
-        md: "0.375rem",
-        lg: "0.5rem",
-        xl: "0.75rem",
+        md: "0.5rem",
+        lg: "0.75rem",
+        xl: "1rem",
+        pill: "9999px",
       },
       fontFamily: {
-        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ['"IBM Plex Sans"', "ui-sans-serif", "system-ui", "sans-serif"],
         mono: ['"IBM Plex Mono"', "ui-monospace", "monospace"],
       },
       boxShadow: {
@@ -99,8 +102,13 @@ export default {
         "control-sm": "var(--control-sm)",
         "control-lg": "var(--control-lg)",
       },
+      width: {
+        control: "var(--control-md)",
+        "control-sm": "var(--control-sm)",
+        "control-lg": "var(--control-lg)",
+      },
       transitionTimingFunction: {
-        // Uma curva só em toda a interface — movimento vira linguagem, não enfeite
+        // Uma curva só na interface inteira — movimento vira linguagem, não enfeite
         ds: "cubic-bezier(0.2, 0, 0, 1)",
       },
       transitionDuration: {
@@ -108,11 +116,11 @@ export default {
       },
       keyframes: {
         "fade-in": {
-          from: { opacity: "0", transform: "translateY(2px)" },
+          from: { opacity: "0", transform: "translateY(3px)" },
           to: { opacity: "1", transform: "none" },
         },
         "scale-in": {
-          from: { opacity: "0", transform: "scale(0.97)" },
+          from: { opacity: "0", transform: "scale(0.98) translateY(4px)" },
           to: { opacity: "1", transform: "none" },
         },
         shimmer: {
@@ -120,7 +128,7 @@ export default {
         },
       },
       animation: {
-        "fade-in": "fade-in 140ms cubic-bezier(0.2,0,0,1)",
+        "fade-in": "fade-in 160ms cubic-bezier(0.2,0,0,1)",
         "scale-in": "scale-in 140ms cubic-bezier(0.2,0,0,1)",
         shimmer: "shimmer 1.6s infinite",
       },

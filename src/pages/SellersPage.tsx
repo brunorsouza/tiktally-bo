@@ -75,6 +75,7 @@ export function SellersPage() {
   return (
     <div className="space-y-5">
       <PageHeader
+        eyebrow="Fiscal"
         title="Sellers com config fiscal"
         description="Empresas cadastradas na Spedy, regime, certificado e volume de notas."
         meta={data && <span className="t-overline">{data.length}</span>}

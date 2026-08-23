@@ -1,5 +1,5 @@
 import { useAffiliates, useCommissions, useMe } from "@/hooks/useBoCoupons";
-import { PageHeader, Panel, Stat, StatGrid, Money } from "@/components/ds";
+import { PageHeader, Panel, Stat, StatGrid, Money, Status } from "@/components/ds";
 import { DataTable, CellStack, type Column } from "@/components/ds/DataTable";
 import { CommissionStatusBadge } from "@/components/CouponBadges";
 import { formatCurrency, formatDate } from "@/lib/formatters";
@@ -30,15 +30,23 @@ export function BusinessPanelPage() {
       header: "Comissão",
       align: "right",
       width: "8rem",
-      cell: (a) =>
-        a.default_commission_type === "fixed"
-          ? formatCurrency(a.default_commission_value / 100)
-          : `${a.default_commission_value}%`,
+      cell: (a) => (
+        <span className="tabular">
+          {a.default_commission_type === "fixed"
+            ? formatCurrency(a.default_commission_value / 100)
+            : `${a.default_commission_value}%`}
+        </span>
+      ),
     },
     {
       header: "Status",
       width: "7rem",
-      cell: (a) => (a.status === "active" ? "Ativo" : "Suspenso"),
+      cell: (a) =>
+        a.status === "active" ? (
+          <Status tone="success">Ativo</Status>
+        ) : (
+          <Status tone="neutral">Suspenso</Status>
+        ),
     },
   ];
 
@@ -68,8 +76,9 @@ export function BusinessPanelPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
+        eyebrow={isAffiliate ? "Meu programa" : "Minha carteira"}
         title={isAffiliate ? "Minhas comissões" : "Minha carteira"}
         description={`${me?.scope_name ? `${me.scope_name} · ` : ""}${
           isAffiliate ? "Comissões geradas pelo seu cupom." : "Afiliados e comissões da sua carteira."

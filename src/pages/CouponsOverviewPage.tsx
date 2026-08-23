@@ -11,6 +11,7 @@ import {
   EmptyState,
   ErrorState,
   Skeleton,
+  ColumnChart,
 } from "@/components/ds";
 
 const PERIODS = [
@@ -23,12 +24,11 @@ export function CouponsOverviewPage() {
   const [period, setPeriod] = useState(30);
   const { data, isLoading, error } = useCouponsOverview(period);
 
-  const maxDay = data ? Math.max(1, ...data.by_day.map((d) => d.redemptions)) : 1;
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
-        title="Cupons"
+        eyebrow="Cupons"
+        title="Visão geral"
         description="Desempenho dos cupons de desconto e teste grátis usados no TikTally."
         actions={<Segmented value={period} options={PERIODS} onChange={setPeriod} />}
       />
@@ -59,25 +59,20 @@ export function CouponsOverviewPage() {
             />
           </StatGrid>
 
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className="grid gap-8 lg:grid-cols-3">
             <Panel title={`Resgates por dia · ${period}d`} className="lg:col-span-2">
               {data.by_day.length === 0 ? (
                 <EmptyState title="Sem resgates no período" />
               ) : (
-                <div className="flex h-40 items-end gap-px">
-                  {data.by_day.map((d) => (
-                    <div key={d.day} className="group flex h-full flex-1 flex-col items-center justify-end gap-1">
-                      <div className="flex w-full flex-1 flex-col justify-end">
-                        <div
-                          className="w-full bg-brand/50 transition-colors duration-ds ease-ds group-hover:bg-brand"
-                          style={{ height: `${(d.redemptions / maxDay) * 100}%` }}
-                          title={`${d.day}: ${d.redemptions} resgates`}
-                        />
-                      </div>
-                      <span className="font-mono text-[0.5rem] text-subtle">{d.day.slice(8, 10)}</span>
-                    </div>
-                  ))}
-                </div>
+                <ColumnChart
+                  height={148}
+                  unit="resgates"
+                  data={data.by_day.map((d) => ({
+                    key: d.day,
+                    label: d.day.slice(5),
+                    parts: [{ value: d.redemptions, tone: "ink" }],
+                  }))}
+                />
               )}
             </Panel>
 
@@ -85,17 +80,22 @@ export function CouponsOverviewPage() {
               {data.top_coupons.filter((c) => c.redeems > 0).length === 0 ? (
                 <EmptyState title="Nenhum resgate ainda" />
               ) : (
-                <ol className="divide-y divide-line/50">
+                <ol>
                   {data.top_coupons
                     .filter((c) => c.redeems > 0)
                     .slice(0, 8)
                     .map((c, i) => (
-                      <li key={c.coupon_id} className="flex items-center justify-between gap-3 py-1.5 text-[0.8125rem]">
+                      <li
+                        key={c.coupon_id}
+                        className="flex items-center justify-between gap-3 border-b border-line/70 py-2 text-[0.8125rem] last:border-0"
+                      >
                         <span className="flex min-w-0 items-center gap-2.5">
-                          <span className="tabular w-3 shrink-0 text-right text-[0.625rem] text-subtle">{i + 1}</span>
+                          <span className="tabular w-3 shrink-0 text-right text-[0.625rem] text-subtle">
+                            {i + 1}
+                          </span>
                           <Link
                             to={`/coupons/${c.coupon_id}`}
-                            className="truncate font-mono text-strong transition-colors duration-ds ease-ds hover:text-brand-strong"
+                            className="truncate font-mono text-strong underline-offset-2 transition-colors duration-ds ease-ds hover:text-brand hover:underline"
                           >
                             {c.code}
                           </Link>

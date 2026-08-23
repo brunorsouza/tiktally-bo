@@ -26,9 +26,16 @@ interface ToastApi {
 const ToastContext = createContext<ToastApi | undefined>(undefined);
 
 const icons: Record<ToastTone, ReactNode> = {
-  success: <CheckCircle2 className="h-5 w-5 text-success" />,
-  error: <XCircle className="h-5 w-5 text-destructive" />,
-  info: <Info className="h-5 w-5 text-blue-400" />,
+  success: <CheckCircle2 className="h-4 w-4 text-success" />,
+  error: <XCircle className="h-4 w-4 text-danger" />,
+  info: <Info className="h-4 w-4 text-info" />,
+};
+
+/** Régua colorida na lateral: dá o tom sem pintar o aviso inteiro. */
+const rules: Record<ToastTone, string> = {
+  success: "border-l-success",
+  error: "border-l-danger",
+  info: "border-l-info",
 };
 
 let counter = 0;
@@ -59,21 +66,22 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div className="fixed bottom-4 right-4 z-[100] flex w-full max-w-sm flex-col gap-2">
+      <div className="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-full max-w-[22rem] flex-col gap-2">
         {toasts.map((t) => (
           <div
             key={t.id}
+            role="status"
             className={cn(
-              "flex items-start gap-3 rounded-lg border border-border bg-card p-3 shadow-lg"
+              "pointer-events-auto flex animate-scale-in cursor-pointer items-start gap-2.5",
+              "rounded-md border border-line border-l-2 bg-surface-1 px-3 py-2.5 shadow-3",
+              rules[t.tone]
             )}
             onClick={() => remove(t.id)}
           >
-            {icons[t.tone]}
+            <span className="mt-px shrink-0">{icons[t.tone]}</span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">{t.title}</p>
-              {t.description && (
-                <p className="mt-0.5 break-words text-xs text-muted-foreground">{t.description}</p>
-              )}
+              <p className="text-[0.8125rem] font-medium leading-snug text-strong">{t.title}</p>
+              {t.description && <p className="t-caption mt-1 break-words leading-relaxed">{t.description}</p>}
             </div>
           </div>
         ))}

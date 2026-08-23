@@ -26,7 +26,6 @@ import {
   Note,
   Skeleton,
   Status,
-  Toolbar,
 } from "@/components/ds";
 import { DataTable, CellStack, type Column } from "@/components/ds/DataTable";
 import { useToast } from "@/components/ui/toast";
@@ -109,11 +108,11 @@ export function AccountsPage() {
     },
     {
       header: "CNPJ",
-      width: "10rem",
+      width: "11rem",
       hideBelow: "md",
       cell: (c) =>
         c.cnpj ? (
-          <span className="tabular text-subtle">{formatCnpj(c.cnpj)}</span>
+          <span className="tabular whitespace-nowrap text-subtle">{formatCnpj(c.cnpj)}</span>
         ) : (
           <span className="text-subtle">—</span>
         ),
@@ -147,7 +146,7 @@ export function AccountsPage() {
     },
     {
       header: "Ambiente da NF-e",
-      width: "20rem",
+      width: "17rem",
       cell: (c) => (
         <CelulaAmbiente
           conta={c}
@@ -162,25 +161,11 @@ export function AccountsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
+        eyebrow="Fiscal"
         title="Contas e ambiente"
         description="Todas as contas do sistema e o ambiente de emissão de cada uma na Spedy."
         meta={contas && <span className="t-overline">{contas.length}</span>}
       />
-
-      <Toolbar>
-        <Input
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar por e-mail, loja ou CNPJ"
-          className="max-w-[22rem]"
-        />
-        <Button size="sm" variant="outline" loading={isFetching} onClick={() => refetch()}>
-          <RefreshCw /> Atualizar
-        </Button>
-        <Button size="sm" onClick={() => setCadastrando(true)}>
-          <UserPlus /> Nova conta
-        </Button>
-      </Toolbar>
 
       <Note tone="warning">
         Em <strong>produção</strong> a nota vai pra SEFAZ e vale de verdade. Em{" "}
@@ -190,6 +175,22 @@ export function AccountsPage() {
       </Note>
 
       <DataTable
+        toolbar={
+          <>
+            <Input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar por e-mail, loja ou CNPJ"
+              className="max-w-[22rem]"
+            />
+            <Button size="sm" variant="outline" loading={isFetching} onClick={() => refetch()}>
+              <RefreshCw /> Atualizar
+            </Button>
+            <Button size="sm" onClick={() => setCadastrando(true)}>
+              <UserPlus /> Nova conta
+            </Button>
+          </>
+        }
         rows={filtradas}
         rowKey={(c) => c.user_id}
         loading={isLoading}
@@ -591,7 +592,7 @@ function CelulaAmbiente({
     ? ambientes?.environments?.[conta.spedy_company_id as string]
     : undefined;
 
-  if (temEmpresaEmProducao && carregando) return <Skeleton className="h-7 w-56" />;
+  if (temEmpresaEmProducao && carregando) return <Skeleton className="h-8 w-48" />;
 
   // Empresa existe mas não deu pra ler o ambiente dela. Um seletor aqui
   // trocaria "não sei" por uma afirmação, e o clique seguinte gravaria em cima
@@ -610,8 +611,11 @@ function CelulaAmbiente({
   const atual = temEmpresaEmProducao ? entrada?.environmentType ?? null : conta.spedy_environment;
   const mexendoNesta = definir.isPending && definir.variables?.userId === conta.user_id;
 
+  // Empilhado, não lado a lado: a nota ("padrão da Spedy · conta em sandbox")
+  // não cabe ao lado de um seletor de 3 posições e quebrava em quatro linhas,
+  // desalinhando a linha inteira da tabela.
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-col items-start gap-1.5">
       <Segmented
         value={atual ?? "production"}
         options={[
@@ -632,7 +636,7 @@ function CelulaAmbiente({
       ) : (
         // Sem empresa o seletor promete o futuro, não descreve o presente. O
         // rótulo tem que dizer isso, senão a linha parece já estar valendo.
-        <span className="t-caption">
+        <span className="t-caption whitespace-nowrap">
           {conta.spedy_environment ? "ao cadastrar" : "padrão da Spedy"}
           {conta.spedy_use_sandbox && conta.spedy_company_id ? " · conta em sandbox" : ""}
         </span>

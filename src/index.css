@@ -1,7 +1,14 @@
-/* Inter na interface (pedido do time) + IBM Plex Mono no DADO. O par funciona:
-   o Inter carrega o texto de UI e o Mono dá a voz de registro pros números —
-   que é de onde vem a leitura de livro-razão. */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+/* ============================================================================
+   Tipografia — IBM Plex Sans + IBM Plex Mono
+   ----------------------------------------------------------------------------
+   Duas vozes: a interface e o DADO (valor, CNPJ, chave, id, data).
+
+   A serifa saiu. A referência de back-office não tem serifa em nenhum dos seis
+   conceitos — e ela era a peça que puxava a tela pro registro de "documento
+   impresso", que não é mais o alvo. Título agora é a mesma família, resolvido
+   por CORPO e PESO.
+   ========================================================================= */
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -10,53 +17,127 @@
 /* ============================================================================
    TikTally Backoffice — Design System
    ----------------------------------------------------------------------------
-   Princípios:
-   1. É FERRAMENTA, não site. Densidade alta, leitura rápida, zero "hero".
-   2. A marca é ACENTO, não fundo. O violeta da TikTally marca ação e estado —
-      não pinta superfície.
-   3. O DADO é o herói. Números tabulares, alinhados, com hierarquia por peso.
-   4. SUPERFÍCIE, não caixa. Elevação separa contexto melhor que borda em tudo.
+   A referência é o back-office bancário moderno (conceitos da UXDA): claro,
+   arejado, sem peso. O que isso quer dizer na prática:
 
-   Dark-only por decisão: é um console interno, usado em sessões longas.
+   1. LUZ. O fundo é um azul-acinzentado frio e claro; o conteúdo é BRANCO.
+      O contraste entre os dois é o que faz o cartão existir — não a borda.
+   2. O CARTÃO FLUTUA. Elevação por sombra difusa e canto generoso. É o oposto
+      da régua de 1px: aqui o bloco tem corpo.
+   3. ESTADO TEM COR, e cor viva. Ponto cinza minúsculo não se lê numa varredura
+      de 50 linhas — pastilha colorida se lê.
+   4. AÇÃO É PÍLULA. Botão totalmente arredondado, uma cor cheia por tela.
+   5. RESPIRO. Densidade média, não máxima: a referência inteira é construída
+      em cima de espaço em branco.
+
+   Dois temas: `claro` (padrão) e `escuro`. O escuro é ardósia fria — a mesma
+   família de matiz do claro, não um invertido.
    ========================================================================= */
 
 @layer base {
+  /* ── PAPEL (claro) ──────────────────────────────────────────────────── */
   :root {
-    /* ── Marca (herdada do app TikTally) ───────────────────────────────── */
-    --brand: 262 83% 62%;
-    --brand-strong: 262 83% 70%;
-    --brand-muted: 262 40% 26%;
+    /* Superfícies — valores AMOSTRADOS da referência, não estimados no olho.
+       Naquela tela, 47,5% dos pixels são branco puro e o "fundo azul" é
+       #f4f9fd: 97% de luminosidade. É gelo, não cinza-azulado. A versão
+       anterior daqui estava em 94% com o dobro da saturação e pesava a tela
+       inteira. */
+    --surface-base: 207 55% 97%; /* a mesa */
+    --surface-1: 0 0% 100%; /* o cartão — branco puro, sem meio-termo */
+    --surface-2: 210 45% 98%; /* rebaixo: cabeçalho de tabela, campo */
+    --surface-3: 210 42% 95%; /* hover, realce */
+
+    /* Texto — cinza QUASE NEUTRO. A referência usa 0% de saturação; o
+       azul-marinho que estava aqui endurecia a leitura e brigava com o gelo
+       do fundo. Um sopro de matiz só pra não ficar clínico. */
+    --text-strong: 215 14% 24%;
+    --text: 215 10% 38%;
+    --text-muted: 215 10% 43%; /* 43% e não 46%: rótulo sobre a mesa fica em 4,5:1 */
+
+    /* Linhas — quase invisíveis: quem separa aqui é a sombra */
+    --line: 213 30% 93%;
+    --line-strong: 213 22% 86%;
+
+    /* Marca — mais viva pra acompanhar o ar da paleta, mas ainda no nível em
+       que texto branco por cima passa em AA (5,6:1). Os acentos da referência
+       vivem a 74% de luminosidade, o que dá 2,4:1 com texto branco — bonito no
+       mockup, ilegível de verdade. Copiei a energia, não o erro. */
+    --brand: 255 88% 62%;
+    --brand-strong: 255 80% 54%;
+    --brand-muted: 255 95% 97%;
     --brand-foreground: 0 0% 100%;
 
-    /* ── Superfícies: profundidade em 4 níveis, não "card em tudo" ─────── */
-    --surface-base: 260 22% 7%; /* fundo da aplicação */
-    --surface-1: 260 20% 10%; /* painéis, sidebar */
-    --surface-2: 260 18% 13%; /* cartões sobre painel */
-    --surface-3: 260 16% 17%; /* hover, inputs, realce */
+    /* Semânticos — o TOM é seguro pra texto e a SUPERFÍCIE é a pastilha. */
+    --success: 152 65% 31%;
+    --success-surface: 146 62% 95%;
+    --success-foreground: 0 0% 100%;
+    --warning: 30 90% 39%;
+    --warning-surface: 40 95% 94%;
+    --warning-foreground: 0 0% 100%;
+    --danger: 356 74% 51%;
+    --danger-surface: 356 92% 96%;
+    --info: 205 85% 43%;
+    --info-surface: 205 95% 95%;
 
-    /* ── Texto: 3 níveis, sem cinza ambíguo ───────────────────────────── */
-    --text-strong: 255 20% 98%;
-    --text: 252 12% 82%;
-    --text-muted: 250 10% 58%;
+    /* Elevação — leve. Sobre um fundo a 97% qualquer sombra pesada suja a
+       tela; aqui ela só precisa levantar o cartão um milímetro. */
+    --shadow-1: 0 1px 2px hsl(214 32% 40% / 0.05), 0 1px 3px hsl(214 32% 40% / 0.04);
+    --shadow-2: 0 1px 3px hsl(214 32% 40% / 0.05), 0 6px 16px -4px hsl(214 34% 34% / 0.10);
+    --shadow-3: 0 4px 10px hsl(214 32% 40% / 0.06), 0 24px 48px -12px hsl(214 36% 28% / 0.18);
 
-    /* ── Linhas ───────────────────────────────────────────────────────── */
-    --line: 258 14% 20%;
-    --line-strong: 258 14% 28%;
+    --scrim: 214 34% 26% / 0.38;
 
-    /* ── Semânticos, calibrados pro fundo escuro ──────────────────────── */
-    --success: 152 62% 47%;
-    --success-surface: 152 45% 14%;
-    --warning: 38 92% 58%;
-    --warning-surface: 38 60% 14%;
-    --danger: 358 72% 60%;
-    --danger-surface: 358 50% 15%;
-    --info: 212 90% 62%;
-    --info-surface: 212 55% 15%;
+    color-scheme: light;
+  }
 
-    /* ── Aliases de compatibilidade (código existente) ─────────────────── */
+  /* ── ESCURO (ardósia fria) ──────────────────────────────────────────── */
+  .dark {
+    /* O PAPEL de cada nível é o mesmo dos dois temas: `surface-1` é sempre o
+       cartão, `surface-2` o rebaixo (barra, cabeçalho de tabela), `surface-3`
+       o realce. O que muda é a direção: no claro o realce escurece, no escuro
+       ele clareia — porque é assim que cada material se comporta. */
+    --surface-base: 222 30% 10%;
+    --surface-2: 222 28% 13%;
+    --surface-1: 222 26% 16%;
+    --surface-3: 222 20% 24%;
+
+    --text-strong: 214 32% 96%;
+    --text: 215 18% 76%;
+    --text-muted: 215 14% 58%;
+
+    --line: 222 20% 23%;
+    --line-strong: 222 18% 33%;
+
+    --brand: 255 95% 74%;
+    --brand-strong: 255 98% 82%;
+    --brand-muted: 255 40% 26%;
+    --brand-foreground: 258 60% 12%;
+
+    --success: 152 58% 55%;
+    --success-surface: 152 38% 17%;
+    --success-foreground: 154 60% 8%;
+    --warning: 38 92% 62%;
+    --warning-surface: 36 48% 18%;
+    --warning-foreground: 36 70% 9%;
+    --danger: 356 82% 68%;
+    --danger-surface: 356 40% 21%;
+    --info: 210 88% 68%;
+    --info-surface: 210 46% 20%;
+
+    --shadow-1: 0 1px 2px hsl(222 40% 3% / 0.5);
+    --shadow-2: 0 2px 8px -2px hsl(222 40% 3% / 0.6), inset 0 1px 0 0 hsl(214 40% 100% / 0.04);
+    --shadow-3: 0 20px 48px -12px hsl(222 45% 2% / 0.75), inset 0 1px 0 0 hsl(214 40% 100% / 0.06);
+
+    --scrim: 222 40% 4% / 0.72;
+
+    color-scheme: dark;
+  }
+
+  :root {
+    /* ── Aliases de compatibilidade (o código antigo fala essa língua) ─── */
     --background: var(--surface-base);
-    --foreground: var(--text-strong);
-    --card: var(--surface-2);
+    --foreground: var(--text);
+    --card: var(--surface-1);
     --card-foreground: var(--text-strong);
     --muted: var(--surface-3);
     --muted-foreground: var(--text-muted);
@@ -64,21 +145,11 @@
     --primary-foreground: var(--brand-foreground);
     --destructive: var(--danger);
     --destructive-foreground: 0 0% 100%;
-    --success-foreground: 0 0% 100%;
-    --warning-foreground: 40 60% 8%;
     --border: var(--line);
     --input: var(--line);
     --ring: var(--brand);
 
-    /* ── Elevação: sombra escura + luz de topo (funciona no dark) ──────── */
-    --shadow-1: 0 1px 2px hsl(260 40% 2% / 0.5);
-    --shadow-2: 0 2px 8px -2px hsl(260 40% 2% / 0.6), 0 1px 0 0 hsl(0 0% 100% / 0.03) inset;
-    --shadow-3: 0 12px 32px -8px hsl(260 40% 2% / 0.7), 0 1px 0 0 hsl(0 0% 100% / 0.04) inset;
-
-    /* Régua de 1px que estrutura a tela — o "papel pautado" do livro-razão */
-    --rule: 1px solid hsl(var(--line));
-
-    /* ── Densidade de ferramenta (não de landing) ─────────────────────── */
+    /* Densidade de ferramenta — a régua de altura de todo controle */
     --control-sm: 1.75rem; /* 28px */
     --control-md: 2rem; /* 32px */
     --control-lg: 2.25rem; /* 36px */
@@ -88,50 +159,43 @@
     @apply border-border;
   }
 
-  html {
-    color-scheme: dark;
-  }
-
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
-    /* cv11: "1" de haste reta · ss01: "a" de andar único — dígitos e letras
-       menos ambíguos no tamanho pequeno da tabela */
-    font-feature-settings: "cv11", "ss01";
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
   }
 
-  /* O mono é reservado ao DADO: valor, código, id, chave, data. Aplicar em
-     `th`/`td` (como estava antes) monoespaçava nome e e-mail junto e a
-     interface inteira lia como terminal — não como Inter. */
+  /* O MONO é reservado ao dado. Aplicá-lo em `th`/`td` inteiros (como já se
+     tentou aqui) monoespaça nome e e-mail junto, e a interface toda passa a
+     ler como terminal. */
   .data,
   code,
+  kbd,
   .tabular {
     font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "zero"; /* zero cortado: 0 nunca vira O */
   }
 
-  /* Números em tabela alinham em coluna mesmo em Inter */
+  /* Números de tabela alinham em coluna mesmo fora do mono */
   th,
   td {
     font-variant-numeric: tabular-nums;
   }
 
-  /* Foco visível e consistente — acessibilidade não é opcional */
   :focus-visible {
     outline: 2px solid hsl(var(--brand));
     outline-offset: 2px;
-    border-radius: 4px;
+    border-radius: 3px;
   }
 
   ::selection {
-    background: hsl(var(--brand) / 0.32);
+    background: hsl(var(--brand) / 0.22);
+    color: hsl(var(--text-strong));
   }
 
-  /* Scrollbar discreta, no tom do tema */
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 11px;
+    height: 11px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
@@ -146,15 +210,33 @@
     background: hsl(var(--text-muted));
     background-clip: content-box;
   }
+
+  /* Quem pediu menos movimento, recebe menos movimento. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
 
 @layer components {
-  /* Escala tipográfica — usar estas classes em vez de escolher tamanho no olho */
+  /* ══ Escala tipográfica ═══════════════════════════════════════════════
+     Usar estas classes em vez de escolher tamanho no olho. É o que impede a
+     interface de derivar tela a tela. */
+
+  /* Título de página. Sem serifa: corpo e peso resolvem, como na referência. */
   .t-display {
-    @apply text-[1.0625rem] font-semibold leading-tight tracking-[-0.01em] text-[hsl(var(--text-strong))];
+    @apply text-[1.375rem] font-semibold leading-[1.2] tracking-[-0.02em] text-[hsl(var(--text-strong))];
   }
+  /* Título de seção/diálogo/estado vazio — SANS. Serifa aqui era enfeite: a
+     hierarquia já está resolvida por peso e posição, e repetir a assinatura em
+     cada caixinha esvazia justamente o que ela deveria marcar. */
   .t-title {
-    @apply text-[0.9375rem] font-semibold leading-snug tracking-[-0.01em] text-[hsl(var(--text-strong))];
+    @apply text-[0.9375rem] font-semibold leading-snug tracking-[-0.006em] text-[hsl(var(--text-strong))];
   }
   .t-body {
     @apply text-[0.8125rem] leading-relaxed text-[hsl(var(--text))];
@@ -163,18 +245,21 @@
     @apply text-[0.75rem] font-medium leading-none text-[hsl(var(--text-muted))];
   }
   .t-caption {
-    @apply text-[0.6875rem] leading-normal text-[hsl(var(--text-muted))];
+    @apply text-[0.71875rem] leading-normal text-[hsl(var(--text-muted))];
   }
-  /* Rótulo de seção. Em Inter — o caixa-alta com entreletra já basta pra ler
-     como rótulo, sem precisar da voz de terminal do mono. */
+  /* Rótulo de coluna e de seção — a "pauta" impressa do formulário.
+     Entreletra contida: a caixa-alta da Plex já nasce larga, e 0,13em fazia
+     rótulo de duas palavras quebrar em duas linhas — o que desalinha a fila de
+     campos inteira. */
   .t-overline {
-    @apply text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-[hsl(var(--text-muted))];
+    @apply text-[0.625rem] font-semibold uppercase leading-none tracking-[0.09em] text-[hsl(var(--text-muted))];
   }
-  /* Número em destaque (métricas) */
+  /* Número em destaque. Mono, porque métrica é DADO. */
   .t-metric {
-    @apply text-[1.375rem] font-medium leading-none tracking-[-0.02em] text-[hsl(var(--text-strong))];
-    font-family: "IBM Plex Mono", monospace;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    @apply text-[1.5rem] font-normal leading-none tracking-[-0.02em] text-[hsl(var(--text-strong))];
     font-variant-numeric: tabular-nums;
     font-feature-settings: "zero";
   }
+
 }

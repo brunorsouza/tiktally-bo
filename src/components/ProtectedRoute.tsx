@@ -39,17 +39,23 @@ export function ProtectedRoute({
 
   if (role === "none") {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
-        <ShieldAlert className="h-12 w-12 text-destructive" />
-        <div>
-          <h1 className="text-lg font-semibold">Acesso restrito</h1>
-          <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-            Esta conta não tem acesso ao backoffice. Fale com o administrador da TikTally.
-          </p>
+      <div className="flex min-h-screen items-center justify-center bg-base p-6">
+        <div className="w-full max-w-[23rem] animate-fade-in rounded-lg border border-line bg-surface-1 shadow-2">
+          <div className="flex items-center gap-2 border-b border-line-strong bg-surface-2 px-5 py-3">
+            <ShieldAlert className="h-3.5 w-3.5 text-danger" />
+            <p className="t-overline text-danger">Acesso restrito</p>
+          </div>
+          <div className="px-5 py-5">
+            <p className="t-title">Esta conta não tem acesso</p>
+            <p className="t-body mt-2 leading-relaxed">
+              O backoffice é da equipe TikTally, parceiros e afiliados. Fale com o administrador
+              para liberar o seu acesso.
+            </p>
+            <Button variant="outline" size="sm" className="mt-5" onClick={() => signOut()}>
+              Sair
+            </Button>
+          </div>
         </div>
-        <Button variant="outline" onClick={() => signOut()}>
-          Sair
-        </Button>
       </div>
     );
   }

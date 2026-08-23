@@ -57,6 +57,7 @@ export function WebhooksPage() {
   return (
     <div className="space-y-5">
       <PageHeader
+        eyebrow="Fiscal"
         title="Webhooks Spedy"
         description="Webhooks da conta Spedy (escopo: conta, não empresa). Reabilite os que a Spedy desligou após 5 falhas de entrega."
         meta={data && <span className="t-overline">{data.length}</span>}

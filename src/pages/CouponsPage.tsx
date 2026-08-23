@@ -7,7 +7,7 @@ import { boCoupons } from "@/lib/boCoupons";
 import { Input, Select, SearchInput } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { PageHeader, Toolbar, Field, Chip, Note, Checkbox } from "@/components/ds";
+import { PageHeader, Field, Chip, Note, Checkbox } from "@/components/ds";
 import { DataTable, CellStack, RowActions, type Column } from "@/components/ds/DataTable";
 import { CouponStatusBadge, DiscountKindBadge } from "@/components/CouponBadges";
 import { useToast } from "@/components/ui/toast";
@@ -135,6 +135,7 @@ export function CouponsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
+        eyebrow="Cupons"
         title="Cupons"
         meta={data && <span className="t-overline">{data.items.length}</span>}
         description={
@@ -149,48 +150,49 @@ export function CouponsPage() {
         }
       />
 
-      <Toolbar>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setSearch(searchInput.trim());
-          }}
-          className="flex min-w-[16rem] flex-1"
-        >
-          <SearchInput
-            icon={<Search />}
-            placeholder="Buscar por código ou descrição…"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
-        </form>
-        <Select
-          selectSize="sm"
-          className="w-40"
-          value={kind}
-          onChange={(e) => setKind(e.target.value as CouponDiscountKind | "")}
-        >
-          {KIND_FILTERS.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </Select>
-        <Select
-          selectSize="sm"
-          className="w-40"
-          value={status}
-          onChange={(e) => setStatus(e.target.value as CouponStatus | "")}
-        >
-          {STATUS_FILTERS.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </Select>
-      </Toolbar>
-
       <DataTable
+        toolbar={
+          <>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setSearch(searchInput.trim());
+              }}
+              className="flex min-w-[16rem] flex-1"
+            >
+              <SearchInput
+                icon={<Search />}
+                placeholder="Buscar por código ou descrição…"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+              />
+            </form>
+            <Select
+              selectSize="sm"
+              className="w-40"
+              value={kind}
+              onChange={(e) => setKind(e.target.value as CouponDiscountKind | "")}
+            >
+              {KIND_FILTERS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </Select>
+            <Select
+              selectSize="sm"
+              className="w-40"
+              value={status}
+              onChange={(e) => setStatus(e.target.value as CouponStatus | "")}
+            >
+              {STATUS_FILTERS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </Select>
+          </>
+        }
         rows={data?.items}
         rowKey={(c) => c.id}
         loading={isLoading}

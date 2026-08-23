@@ -11,7 +11,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Input, Select, SearchInput } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { PageHeader, Toolbar, Field, Chip, Status } from "@/components/ds";
+import { PageHeader, Field, Chip, Status } from "@/components/ds";
 import { DataTable, CellStack, RowActions, type Column } from "@/components/ds/DataTable";
 import { formatCurrency } from "@/lib/formatters";
 import type { Affiliate, AffiliateInput, CommissionType, EntityStatus } from "@/types";
@@ -99,6 +99,7 @@ export function AffiliatesPage() {
   return (
     <div className="space-y-4">
       <PageHeader
+        eyebrow="Afiliados"
         title="Afiliados"
         description={
           isBusiness
@@ -115,34 +116,35 @@ export function AffiliatesPage() {
         }
       />
 
-      <Toolbar>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setSearch(searchInput.trim());
-          }}
-          className="flex min-w-[16rem] flex-1"
-        >
-          <SearchInput
-            icon={<Search />}
-            placeholder="Buscar por nome ou e-mail…"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
-        </form>
-        <Select
-          selectSize="sm"
-          className="w-40"
-          value={status}
-          onChange={(e) => setStatus(e.target.value as EntityStatus | "")}
-        >
-          <option value="">Todos os status</option>
-          <option value="active">Ativos</option>
-          <option value="suspended">Suspensos</option>
-        </Select>
-      </Toolbar>
-
       <DataTable
+        toolbar={
+          <>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setSearch(searchInput.trim());
+              }}
+              className="flex min-w-[16rem] flex-1"
+            >
+              <SearchInput
+                icon={<Search />}
+                placeholder="Buscar por nome ou e-mail…"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+              />
+            </form>
+            <Select
+              selectSize="sm"
+              className="w-40"
+              value={status}
+              onChange={(e) => setStatus(e.target.value as EntityStatus | "")}
+            >
+              <option value="">Todos os status</option>
+              <option value="active">Ativos</option>
+              <option value="suspended">Suspensos</option>
+            </Select>
+          </>
+        }
           rows={data?.items}
           rowKey={(a) => a.id}
           loading={isLoading}

@@ -3,7 +3,7 @@ import { Download, Gift } from "lucide-react";
 import { useRedemptions } from "@/hooks/useBoCoupons";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { PageHeader, Toolbar, Status, Money, Pagination } from "@/components/ds";
+import { PageHeader, Status, Money, Pagination } from "@/components/ds";
 import { DataTable, type Column } from "@/components/ds/DataTable";
 import { useToast } from "@/components/ui/toast";
 import { formatDateTime } from "@/lib/formatters";
@@ -88,6 +88,7 @@ export function RedemptionsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
+        eyebrow="Cupons"
         title="Resgates"
         description="Histórico de uso dos cupons — descontos em compras e trials concedidos."
         actions={
@@ -97,72 +98,72 @@ export function RedemptionsPage() {
         }
       />
 
-      <Toolbar>
-        <Input
-          inputSize="sm"
-          type="date"
-          aria-label="Data inicial"
-          value={from}
-          onChange={(e) => {
-            setFrom(e.target.value);
-            setPage(1);
-          }}
-          className="w-40"
-        />
-        <span className="t-caption">até</span>
-        <Input
-          inputSize="sm"
-          type="date"
-          aria-label="Data final"
-          value={to}
-          onChange={(e) => {
-            setTo(e.target.value);
-            setPage(1);
-          }}
-          className="w-40"
-        />
-        <Select
-          selectSize="sm"
-          className="w-52"
-          value={type}
-          onChange={(e) => {
-            setType(e.target.value);
-            setPage(1);
-          }}
-        >
-          {TYPE_FILTERS.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </Select>
-      </Toolbar>
-
-      <div className="space-y-3">
-        <DataTable
-          rows={data?.items}
-          rowKey={(r) => r.id}
-          loading={isLoading}
-          error={error ? (error as Error).message : null}
-          empty={{
-            title: "Nenhum resgate",
-            description: "Assim que um cupom for usado no checkout, o registro aparece aqui.",
-            icon: <Gift />,
-          }}
-          columns={colunas}
-        />
-
-        {data && data.items.length > 0 && (
-          <Pagination
-            page={page}
-            totalPages={data.totalPages}
-            total={data.total}
-            unit="resgates"
-            fetching={isFetching}
-            onPage={setPage}
-          />
-        )}
-      </div>
+      <DataTable
+        toolbar={
+          <>
+            <Input
+              inputSize="sm"
+              type="date"
+              aria-label="Data inicial"
+              value={from}
+              onChange={(e) => {
+                setFrom(e.target.value);
+                setPage(1);
+              }}
+              className="w-40"
+            />
+            <span className="t-caption">até</span>
+            <Input
+              inputSize="sm"
+              type="date"
+              aria-label="Data final"
+              value={to}
+              onChange={(e) => {
+                setTo(e.target.value);
+                setPage(1);
+              }}
+              className="w-40"
+            />
+            <Select
+              selectSize="sm"
+              className="w-52"
+              value={type}
+              onChange={(e) => {
+                setType(e.target.value);
+                setPage(1);
+              }}
+            >
+              {TYPE_FILTERS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </Select>
+          </>
+        }
+        rows={data?.items}
+        rowKey={(r) => r.id}
+        loading={isLoading}
+        error={error ? (error as Error).message : null}
+        empty={{
+          title: "Nenhum resgate",
+          description: "Assim que um cupom for usado no checkout, o registro aparece aqui.",
+          icon: <Gift />,
+        }}
+        columns={colunas}
+        footer={
+          data && data.items.length > 0 ? (
+            <Pagination
+              page={page}
+              totalPages={data.totalPages}
+              total={data.total}
+              unit="resgates"
+              fetching={isFetching}
+              onPage={setPage}
+            />
+          ) : undefined
+        }
+      />
     </div>
   );
 }

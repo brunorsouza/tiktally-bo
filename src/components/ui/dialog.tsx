@@ -20,6 +20,10 @@ interface DialogProps {
  * Diálogo é onde a pessoa DIGITA — por isso respira mais que o resto da
  * interface: cabeçalho com régua, corpo com padding maior, rodapé separado.
  * Densidade de tabela aqui vira claustrofobia.
+ *
+ * Cabeçalho e rodapé ficam no REBAIXO e o corpo na folha: a ficha tem as duas
+ * abas presas e a área de escrita limpa no meio. O véu é tinta quente com um
+ * sopro de desfoque — preto puro sobre papel morno acinzenta a tela toda.
  */
 export function Dialog({ open, onClose, title, description, footer, children, className }: DialogProps) {
   useEffect(() => {
@@ -41,7 +45,7 @@ export function Dialog({ open, onClose, title, description, footer, children, cl
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[hsl(var(--scrim))] p-4 backdrop-blur-[2px]"
       onClick={onClose}
       role="presentation"
     >
@@ -50,12 +54,12 @@ export function Dialog({ open, onClose, title, description, footer, children, cl
         aria-modal="true"
         className={cn(
           "flex max-h-[85vh] w-full max-w-[30rem] animate-scale-in flex-col overflow-hidden",
-          "rounded-lg border border-line-strong bg-surface-2 shadow-3",
+          "rounded-xl border border-line bg-surface-1 shadow-3",
           className
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
+        <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-4">
           <div className="min-w-0">
             {title && <h2 className="t-title">{title}</h2>}
             {description && <p className="t-caption mt-1 leading-relaxed">{description}</p>}
@@ -69,7 +73,7 @@ export function Dialog({ open, onClose, title, description, footer, children, cl
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
 
         {/* Irmão do corpo, não filho: fica ancorado mesmo com o conteúdo rolando */}
         {footer && (

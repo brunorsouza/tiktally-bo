@@ -4,7 +4,7 @@ import { useBusinesses, useBusinessMutations, useBusinessUserMutation } from "@/
 import { Input, Select, SearchInput } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { PageHeader, Toolbar, Field, Chip, Status } from "@/components/ds";
+import { PageHeader, Field, Chip, Status } from "@/components/ds";
 import { DataTable, CellStack, RowActions, type Column } from "@/components/ds/DataTable";
 import { StatusBadge } from "./AffiliatesPage";
 import type { Business, BusinessInput, EntityStatus } from "@/types";
@@ -67,6 +67,7 @@ export function BusinessesPage() {
   return (
     <div className="space-y-5">
       <PageHeader
+        eyebrow="Afiliados"
         title="Businesses"
         description="Parceiros e agências que gerem uma carteira de afiliados e cupons."
         meta={data && <span className="t-overline">{data.items.length}</span>}
@@ -77,24 +78,25 @@ export function BusinessesPage() {
         }
       />
 
-      <Toolbar>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setSearch(searchInput.trim());
-          }}
-          className="flex min-w-[16rem] flex-1"
-        >
-          <SearchInput
-            icon={<Search />}
-            placeholder="Buscar por nome ou e-mail…"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
-        </form>
-      </Toolbar>
-
       <DataTable
+        toolbar={
+          <>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setSearch(searchInput.trim());
+              }}
+              className="flex min-w-[16rem] flex-1"
+            >
+              <SearchInput
+                icon={<Search />}
+                placeholder="Buscar por nome ou e-mail…"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+              />
+            </form>
+          </>
+        }
         rows={data?.items}
         rowKey={(b) => b.id}
         loading={isLoading}
