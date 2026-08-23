@@ -2,9 +2,11 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { PREVIEW_MODE } from "@/lib/boFiscal";
@@ -38,6 +40,16 @@ async function checkIsAdmin(userId: string): Promise<boolean> {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
+  /**
+   * Quem estava logado na última vez que o estado de auth mudou.
+   *
+   * Guardado em ref (não em state) de propósito: a comparação precisa
+   * acontecer DENTRO do callback do `onAuthStateChange`, antes de qualquer
+   * re-render — se virasse state, o render com a sessão nova aconteceria antes
+   * de a gente perceber que a identidade trocou.
+   */
+  const identidadeAnterior = useRef<string | null>(PREVIEW_MODE ? PREVIEW_USER.id : null);
   const [session, setSession] = useState<Session | null>(PREVIEW_MODE ? PREVIEW_SESSION : null);
   const [user, setUser] = useState<User | null>(PREVIEW_MODE ? PREVIEW_USER : null);
   const [isAdmin, setIsAdmin] = useState(PREVIEW_MODE);
@@ -49,6 +61,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function hydrate(s: Session | null) {
       if (!active) return;
+
+      /**
+       * Trocou de identidade → o cache do React Query da sessão anterior não
+       * vale mais NADA e precisa morrer aqui, antes do `setSession`.
+       *
+       * Sem isto: sai do admin, entra como afiliado, e `useMe()` devolve
+       * `{role:"admin"}` do cache — com `staleTime` de 5 min, sem nem disparar
+       * refetch. O `ProtectedRoute` então libera rota de admin pra um JWT de
+       * afiliado, o gateway responde 403, e só um F5 (QueryClient novo)
+       * resolvia. O mesmo valia pra `["invoices"]`, `["coupons"]` e as demais:
+       * nenhuma chave carrega a identidade de quem pediu o dado.
+       *
+       * A comparação é pelo ID do usuário, não pelo evento: `SIGNED_IN` e
+       * `TOKEN_REFRESHED` disparam o tempo todo para a MESMA pessoa (foco de
+       * aba, renovação de token). Limpar a cada evento derrubaria o cache
+       * inteiro de minuto em minuto.
+       *
+       * Ponto único: logout, login de outro usuário e logout feito em outra
+       * aba passam todos por aqui.
+       */
+      const identidade = s?.user?.id ?? null;
+      if (identidade !== identidadeAnterior.current) {
+        identidadeAnterior.current = identidade;
+        queryClient.clear();
+      }
+
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
@@ -70,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       active = false;
       sub.subscription.unsubscribe();
     };
-  }, []);
+  }, [queryClient]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -81,6 +119,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (PREVIEW_MODE) return; // no preview, não há sessão real pra encerrar
     await supabase.auth.signOut();
     setIsAdmin(false);
+    // O cache não é limpo aqui: quem faz isso é o `hydrate`, ao ver a
+    // identidade virar `null`. Um só lugar decide — dois pontos limpando
+    // acabam divergindo, e o `hydrate` cobre também o logout feito em outra
+    // aba, que nunca passa por este botão.
   };
 
   return (
