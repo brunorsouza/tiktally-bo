@@ -139,6 +139,14 @@ npx supabase functions deploy bo-coupons --project-ref zgkxtyewmbkupuzeoyya
 Só entra quem tem `profiles.is_admin = true` no projeto. Use o mesmo e-mail/senha
 do app TikTally. Contas sem admin veem tela de "acesso restrito".
 
+O acesso é gerido pela própria tela **Sistema → Administradores**, que concede de
+duas formas: promovendo uma conta que já existe (sem tocar na senha dela) ou
+criando o login e promovendo. Revogar baixa a flag e **não apaga a conta** — ela
+pode ser o login de seller da pessoa.
+
+Duas travas no servidor, porque as duas trancam gente do lado de fora:
+ninguém remove o próprio acesso, e ninguém remove o último administrador.
+
 ## Deploy do front
 
 Build estático (`npm run build` → `dist/`). Suba em qualquer host estático

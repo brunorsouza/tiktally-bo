@@ -9,6 +9,7 @@ import { SellersPage } from "./pages/SellersPage";
 import { WebhooksPage } from "./pages/WebhooksPage";
 import { CompaniesPage } from "./pages/CompaniesPage";
 import { AccountsPage } from "./pages/AccountsPage";
+import { AdminsPage } from "./pages/AdminsPage";
 import { CouponsOverviewPage } from "./pages/CouponsOverviewPage";
 import { CouponsPage } from "./pages/CouponsPage";
 import { CouponDetailPage } from "./pages/CouponDetailPage";
@@ -50,6 +51,7 @@ export default function App() {
       <Route path="/webhooks" element={<Protected><WebhooksPage /></Protected>} />
       <Route path="/companies" element={<Protected><CompaniesPage /></Protected>} />
       <Route path="/accounts" element={<Protected><AccountsPage /></Protected>} />
+      <Route path="/admins" element={<Protected><AdminsPage /></Protected>} />
       <Route path="/coupons-overview" element={<Protected><CouponsOverviewPage /></Protected>} />
       <Route
         path="/coupons"

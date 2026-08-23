@@ -14,6 +14,7 @@ import {
   Building2,
   Coins,
   Wallet,
+  ShieldCheck,
   Sun,
   Moon,
   PanelRight,
@@ -83,6 +84,13 @@ const adminSections: NavSection[] = [
       { to: "/businesses", label: "Businesses", icon: Building2 },
       { to: "/commissions", label: "Comissões", icon: Coins },
     ],
+  },
+  {
+    // Seção própria: quem entra no backoffice não é assunto de Fiscal, de
+    // Cupons nem de Afiliados — e enfiar em qualquer uma delas esconderia a
+    // tela mais sensível do console dentro de um menu que fala de outra coisa.
+    title: "Sistema",
+    items: [{ to: "/admins", label: "Administradores", icon: ShieldCheck }],
   },
 ];
 

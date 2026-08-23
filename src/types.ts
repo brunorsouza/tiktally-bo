@@ -673,3 +673,36 @@ export interface SetAccountEnvironmentResult {
   environment: SpedyEnvironmentType;
   company_id?: string;
 }
+
+// ── Administradores do backoffice ──────────────────────────────────────────
+
+/**
+ * Quem tem acesso ao backoffice. "Ser admin" é a coluna `profiles.is_admin` —
+ * é dela que sai toda a proteção do console.
+ */
+export interface BoAdmin {
+  user_id: string;
+  email: string | null;
+  created_at: string | null;
+  last_sign_in_at: string | null;
+  shop_name: string | null;
+  /** Conta que também é seller do TikTally — revogar aqui não a apaga. */
+  tambem_seller: boolean;
+  /** A conta de quem está olhando. Ninguém revoga o próprio acesso. */
+  eu_mesmo: boolean;
+}
+
+export interface GrantAdminInput {
+  email: string;
+  /** `link` promove uma conta existente; `create` cria o login e promove. */
+  mode: "link" | "create";
+  /** Só em `create`. */
+  password?: string;
+}
+
+export interface GrantAdminResult {
+  user_id: string;
+  email: string;
+  mode: "link" | "create";
+  tambem_seller: boolean;
+}

@@ -1,6 +1,9 @@
 import { createGateway, PREVIEW_MODE } from "./gateway";
 import { mockBoFiscal } from "./mockBoFiscal";
 import type {
+  BoAdmin,
+  GrantAdminInput,
+  GrantAdminResult,
   InvoiceMetrics,
   PaginatedInvoices,
   InvoiceDetail,
@@ -129,6 +132,27 @@ const realBoFiscal = {
 
   /** Todas as contas, com ou sem cadastro fiscal. */
   listAccounts: () => call<BoAccount[]>("list_accounts"),
+
+  /** Quem tem acesso ao backoffice. */
+  listAdmins: () => call<{ items: BoAdmin[]; total: number }>("list_admins"),
+
+  /**
+   * Concede acesso de administrador. `link` promove uma conta que já existe
+   * (o caso comum — quase todo mundo do time já tem login no TikTally) sem
+   * tocar na senha dela; `create` cria o login e promove.
+   */
+  grantAdmin: (input: GrantAdminInput) =>
+    call<GrantAdminResult>("grant_admin", {
+      email: input.email,
+      mode: input.mode,
+      password: input.password ?? null,
+    }),
+
+  /**
+   * Remove o acesso de administrador. NÃO apaga a conta: ela pode ser o login
+   * de seller da pessoa, e apagar levaria junto notas, assinatura e empresa.
+   */
+  revokeAdmin: (userId: string) => call<{ user_id: string }>("revoke_admin", { user_id: userId }),
 
   /**
    * Cria uma conta do TikTally. Mesmo caminho do signup público (os dados vão

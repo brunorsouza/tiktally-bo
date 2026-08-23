@@ -1487,6 +1487,172 @@ async function actionCancelInvoice(db: SupabaseClient, p: Record<string, any>) {
 // Handler
 // ─────────────────────────────────────────────────────────────────────────
 
+// ── Administradores do backoffice ──────────────────────────────────────────
+
+/**
+ * Quem tem acesso ao backoffice.
+ *
+ * "Ser admin" é uma coluna booleana em `profiles` — não uma tabela separada,
+ * não um papel do Supabase Auth. Toda a proteção do backoffice sai daqui: o
+ * gate no topo desta function e o `me` do `bo-coupons` leem esse mesmo campo.
+ * Por isso as três ações abaixo são as mais sensíveis do gateway: quem chega
+ * nelas já é admin, e o que elas fazem é decidir quem mais será.
+ */
+async function actionListAdmins(db: SupabaseClient, actorId: string) {
+  const { data: perfis, error } = await db
+    .from("profiles")
+    .select("id, shop_name, cnpj, created_at")
+    .eq("is_admin", true);
+  if (error) throw new Error(error.message);
+
+  // Um `getUserById` por admin, e não a lista inteira do Auth: administradores
+  // são poucos, e varrer milhares de contas pra achar três é a consulta que
+  // envelhece mal conforme a base cresce.
+  const admins = await Promise.all(
+    (perfis ?? []).map(async (perfil: any) => {
+      const { data } = await db.auth.admin.getUserById(perfil.id);
+      return {
+        user_id: perfil.id,
+        email: data?.user?.email ?? null,
+        created_at: data?.user?.created_at ?? perfil.created_at ?? null,
+        last_sign_in_at: data?.user?.last_sign_in_at ?? null,
+        shop_name: perfil.shop_name ?? null,
+        // Conta que também é seller do TikTally. Não é problema — o `me` do
+        // bo-coupons dá prioridade a admin, então não há escopo ambíguo —, mas
+        // a tela precisa mostrar, porque revogar aqui NÃO apaga a conta dela.
+        tambem_seller: !!perfil.cnpj,
+        eu_mesmo: perfil.id === actorId,
+      };
+    })
+  );
+
+  admins.sort((a, b) => (a.email ?? "").localeCompare(b.email ?? ""));
+  return ok({ items: admins, total: admins.length });
+}
+
+/**
+ * Concede acesso de administrador.
+ *
+ * Dois modos, pelo mesmo motivo do cadastro de afiliado e de business:
+ *
+ *  - `link` — a pessoa JÁ tem login (é comum: quase todo mundo do time tem
+ *    conta de teste no TikTally). Aqui só levantamos a flag; a senha dela não
+ *    é tocada.
+ *  - `create` — não tem login nenhum, então criamos e já promovemos.
+ *
+ * Sem os dois, o caminho comum viraria "criar uma segunda conta pra mesma
+ * pessoa porque a primeira já existia" — que é como se acumula login órfão.
+ *
+ * `email_confirm: true` segue o resto do backoffice: quem cadastra é o admin,
+ * que já sabe de quem é o e-mail, e exigir confirmação travaria justamente o
+ * acesso que acabou de ser concedido.
+ */
+async function actionGrantAdmin(db: SupabaseClient, p: Record<string, any>, actorId: string) {
+  const email = String(p.email ?? "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail("E-mail inválido");
+  const modo: "create" | "link" = p.mode === "create" ? "create" : "link";
+
+  let userId: string;
+
+  if (modo === "link") {
+    const { data: achado, error: rpcErr } = await db.rpc("bo_user_id_by_email", { p_email: email });
+    if (rpcErr) throw new Error(rpcErr.message);
+    if (!achado) {
+      return fail('Nenhuma conta com esse e-mail. Use "Criar conta nova".', 404);
+    }
+    userId = String(achado);
+  } else {
+    const senha = String(p.password ?? "");
+    if (senha.length < 8) return fail("Senha deve ter ao menos 8 caracteres");
+
+    const { data: criado, error: cErr } = await db.auth.admin.createUser({
+      email,
+      password: senha,
+      email_confirm: true,
+    });
+    if (cErr || !criado?.user?.id) {
+      const msg = cErr?.message ?? "sem user id";
+      if (/registered|already|exists/i.test(msg)) {
+        return fail('Já existe uma conta com esse e-mail. Use "Promover conta existente".');
+      }
+      return fail(`Falha ao criar a conta: ${msg}`);
+    }
+    userId = criado.user.id;
+  }
+
+  // O profile é criado pelo gatilho `handle_new_user`, que roda no INSERT em
+  // auth.users — então já existe quando o `createUser` retorna. Se não existir,
+  // algo quebrou no gatilho e promover às cegas criaria um admin sem perfil.
+  const { data: perfil } = await db
+    .from("profiles")
+    .select("id, is_admin, cnpj")
+    .eq("id", userId)
+    .maybeSingle();
+  if (!perfil) {
+    return fail("Conta criada, mas o profile não foi gerado (gatilho handle_new_user). Verifique antes de promover.", 500);
+  }
+  if (perfil.is_admin) return fail("Essa conta já é administradora.");
+
+  const { error: upErr } = await db
+    .from("profiles")
+    .update({ is_admin: true, updated_at: new Date().toISOString() })
+    .eq("id", userId);
+  if (upErr) throw new Error(upErr.message);
+
+  await audit(db, actorId, "admin.grant", "profiles", userId, { email, mode: modo });
+
+  return ok({ user_id: userId, email, mode: modo, tambem_seller: !!perfil.cnpj });
+}
+
+/**
+ * Revoga o acesso de administrador.
+ *
+ * NÃO apaga a conta — só baixa a flag. É deliberado: a conta pode ser o login
+ * de seller da pessoa, e apagar aqui levaria junto notas, assinatura e empresa
+ * na Spedy. Tirar o acesso e apagar a conta são decisões diferentes.
+ *
+ * Duas travas, e as duas já custaram caro em outros sistemas:
+ *
+ *  1. Ninguém remove o PRÓPRIO acesso. É o acidente mais comum — a pessoa
+ *     limpa a lista, chega no próprio nome e se tranca do lado de fora.
+ *  2. Ninguém remove o ÚLTIMO admin. Sem isso, o backoffice inteiro fica sem
+ *     ninguém que possa entrar, e o conserto vira SQL na mão em produção.
+ */
+async function actionRevokeAdmin(db: SupabaseClient, p: Record<string, any>, actorId: string) {
+  const userId = String(p.user_id ?? "");
+  if (!userId) return fail("user_id obrigatório");
+
+  if (userId === actorId) {
+    return fail("Você não pode remover o seu próprio acesso de administrador.");
+  }
+
+  const { data: alvo } = await db
+    .from("profiles")
+    .select("id, is_admin")
+    .eq("id", userId)
+    .maybeSingle();
+  if (!alvo) return fail("Conta não encontrada", 404);
+  if (!alvo.is_admin) return fail("Essa conta não é administradora.");
+
+  const { count, error: cntErr } = await db
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("is_admin", true);
+  if (cntErr) throw new Error(cntErr.message);
+  if ((count ?? 0) <= 1) {
+    return fail("Este é o último administrador — remover deixaria o backoffice sem ninguém com acesso.");
+  }
+
+  const { error: upErr } = await db
+    .from("profiles")
+    .update({ is_admin: false, updated_at: new Date().toISOString() })
+    .eq("id", userId);
+  if (upErr) throw new Error(upErr.message);
+
+  await audit(db, actorId, "admin.revoke", "profiles", userId, {});
+  return ok({ user_id: userId });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return fail("Método não suportado", 405);
@@ -1555,6 +1721,12 @@ Deno.serve(async (req) => {
         return await actionListPlans(db);
       case "set_account_plan":
         return await actionSetAccountPlan(db, body, actorId);
+      case "list_admins":
+        return await actionListAdmins(db, actorId);
+      case "grant_admin":
+        return await actionGrantAdmin(db, body, actorId);
+      case "revoke_admin":
+        return await actionRevokeAdmin(db, body, actorId);
       case "list_accounts":
         return await actionListAccounts(db);
       case "companies_environments":

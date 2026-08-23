@@ -23,7 +23,42 @@ import type {
   SpedyEnvironmentsMap,
   SetAccountEnvironmentResult,
   SpedyEnvironmentType,
+  BoAdmin,
+  GrantAdminInput,
+  GrantAdminResult,
 } from "@/types";
+
+/** Admins do preview. Mutável de propósito: dá pra exercitar conceder e
+ *  revogar na tela sem backend, inclusive as travas. */
+const ADMINS: BoAdmin[] = [
+  {
+    user_id: "dev-preview",
+    email: "preview@tiktally.dev",
+    created_at: "2026-01-10T12:00:00.000Z",
+    last_sign_in_at: "2026-08-23T09:40:00.000Z",
+    shop_name: null,
+    tambem_seller: false,
+    eu_mesmo: true,
+  },
+  {
+    user_id: "a2",
+    email: "bruno@tiktally.com.br",
+    created_at: "2026-02-02T12:00:00.000Z",
+    last_sign_in_at: "2026-08-22T18:10:00.000Z",
+    shop_name: null,
+    tambem_seller: false,
+    eu_mesmo: false,
+  },
+  {
+    user_id: "a3",
+    email: "loja.aurora@gmail.com",
+    created_at: "2026-03-15T12:00:00.000Z",
+    last_sign_in_at: null,
+    shop_name: "Aurora Cosméticos",
+    tambem_seller: true,
+    eu_mesmo: false,
+  },
+];
 
 const delay = <T>(value: T, ms = 250): Promise<T> =>
   new Promise((r) => setTimeout(() => r(value), ms));
@@ -228,6 +263,40 @@ function buildMetrics(): InvoiceMetrics {
 
 export const mockBoFiscal = {
   metrics: () => delay(buildMetrics()),
+
+  listAdmins: () => delay({ items: [...ADMINS], total: ADMINS.length }),
+
+  grantAdmin: (input: GrantAdminInput): Promise<GrantAdminResult> => {
+    const email = input.email.trim().toLowerCase();
+    if (ADMINS.some((a) => a.email === email)) {
+      return Promise.reject(new Error("Essa conta já é administradora."));
+    }
+    const novo: BoAdmin = {
+      user_id: `a${Date.now()}`,
+      email,
+      created_at: new Date().toISOString(),
+      last_sign_in_at: null,
+      shop_name: null,
+      tambem_seller: false,
+      eu_mesmo: false,
+    };
+    ADMINS.push(novo);
+    return delay({ user_id: novo.user_id, email, mode: input.mode, tambem_seller: false });
+  },
+
+  revokeAdmin: (userId: string) => {
+    const i = ADMINS.findIndex((a) => a.user_id === userId);
+    // As mesmas travas do servidor, pra o preview não mentir sobre o que a
+    // tela faz de verdade.
+    if (ADMINS[i]?.eu_mesmo) {
+      return Promise.reject(new Error("Você não pode remover o seu próprio acesso de administrador."));
+    }
+    if (ADMINS.length <= 1) {
+      return Promise.reject(new Error("Este é o último administrador."));
+    }
+    if (i >= 0) ADMINS.splice(i, 1);
+    return delay({ user_id: userId });
+  },
 
   listInvoices: (filters: InvoiceFilters = {}): Promise<PaginatedInvoices> => {
     let items = [...INVOICES];
