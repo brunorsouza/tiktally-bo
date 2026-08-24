@@ -166,18 +166,30 @@ const paginate = <T>(items: T[], page = 1, pageSize = 50) => ({
 
 export const mockBoCoupons = {
   // Preview roda como admin (vê todas as telas).
-  me: (): Promise<MeInfo> =>
-    delay({
+  /**
+   * Papel do preview. Escolhível por `?papel=business|affiliate|admin`, que
+   * fica gravado — sem isso, o preview só mostra a interface de admin e as
+   * telas de parceiro e afiliado (que têm outra navegação e outro painel
+   * lateral) só apareciam com três contas reais na mão.
+   */
+  me: (): Promise<MeInfo> => {
+    const daUrl = new URLSearchParams(location.search).get("papel");
+    if (daUrl) localStorage.setItem("tiktally-bo-preview-papel", daUrl);
+    const papel = (localStorage.getItem("tiktally-bo-preview-papel") ?? "admin") as MeInfo["role"];
+    const ehAdmin = papel === "admin";
+
+    return delay({
       user_id: "dev-preview",
-      role: "admin",
-      business_id: null,
-      affiliate_id: null,
-      scope_name: null,
+      role: papel,
+      business_id: papel === "business" ? "b1" : null,
+      affiliate_id: papel === "affiliate" ? "a1" : null,
+      scope_name: ehAdmin ? null : papel === "business" ? "Agência Alfa" : "João Silva",
       coupon_discount_percent: 20,
       commission_pool_percent: 30,
       coupon_percent_options: [10, 15, 20],
       own_coupon_max_percent: 10,
-    }),
+    });
+  },
 
   myPerformance: (): Promise<MyPerformance> => {
     const aff = affiliates[0];

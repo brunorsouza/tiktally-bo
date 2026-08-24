@@ -37,9 +37,18 @@ function Secao({ titulo, children }: { titulo: string; children: React.ReactNode
   );
 }
 
-/** Contador que leva pro trabalho. Zero fica apagado, não some: a ausência de
- *  pendência é informação — some com a linha e o operador não sabe se está
- *  limpo ou se a tela não carregou. */
+/**
+ * Contador que leva pro trabalho.
+ *
+ * Zero fica apagado, não some: a ausência de pendência é informação — some com
+ * a linha e o operador não sabe se está limpo ou se a tela não carregou.
+ *
+ * O valor e o rótulo ficam EMPILHADOS, não lado a lado. A versão anterior
+ * reservava uma coluna de largura fixa (`w-8`) pro valor, o que servia pra
+ * contador de um dígito e quebrava feio no primeiro valor largo: "R$ 1.870,16"
+ * estourava os 32px e montava em cima do rótulo. Empilhar resolve a classe
+ * inteira — número de qualquer largura cabe, e o rótulo nunca disputa a linha.
+ */
 function Contador({
   to,
   icon,
@@ -62,13 +71,22 @@ function Contador({
     <Link
       to={to}
       className={cn(
-        "-mx-2 flex items-center gap-2.5 rounded-md px-2 py-1.5",
+        "-mx-2 flex items-start gap-2.5 rounded-md px-2 py-2",
         "transition-colors duration-ds ease-ds hover:bg-surface-3"
       )}
     >
-      <span className={cn("shrink-0 [&_svg]:h-3.5 [&_svg]:w-3.5", zerado ? "text-subtle" : cor)}>{icon}</span>
-      <span className={cn("tabular w-8 shrink-0 text-[0.9375rem] font-medium leading-none", cor)}>{value}</span>
-      <span className="min-w-0 flex-1 text-[0.75rem] leading-snug text-ink">{label}</span>
+      <span
+        className={cn(
+          "mt-px shrink-0 [&_svg]:h-3.5 [&_svg]:w-3.5",
+          zerado ? "text-subtle" : cor
+        )}
+      >
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className={cn("tabular block text-[0.9375rem] font-medium leading-none", cor)}>{value}</span>
+        <span className="mt-1 block text-[0.75rem] leading-snug text-ink">{label}</span>
+      </span>
     </Link>
   );
 }
@@ -179,7 +197,7 @@ function RailCarteira({ afiliado }: { afiliado: boolean }) {
             to={destino}
             icon={<Clock />}
             value={aprovadas}
-            label="comissões aprovadas, aguardando pagamento"
+            label="comissões aprovadas, a pagar"
             tone="warning"
           />
         </div>
