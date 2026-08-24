@@ -11,7 +11,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Input, Select, SearchInput } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { PageHeader, Field, Chip, Status } from "@/components/ds";
+import { PageHeader, Field, Note, Segmented, Status } from "@/components/ds";
 import { DataTable, CellStack, RowActions, type Column } from "@/components/ds/DataTable";
 import { formatCurrency } from "@/lib/formatters";
 import type { Affiliate, AffiliateInput, CommissionType, EntityStatus } from "@/types";
@@ -313,6 +313,23 @@ function AffiliateDialog({ affiliate, onClose }: { affiliate: Affiliate | null; 
  */
 function AffiliateAccessDialog({ affiliate, onClose }: { affiliate: Affiliate; onClose: () => void }) {
   const { create, link } = useAffiliateUserMutation();
+  const { data: me } = useMe();
+
+  /**
+   * Criar login é ato de ADMIN — o servidor recusa para business.
+   *
+   * O motivo está no gate da `bo-coupons`: `createUser` define senha e marca o
+   * e-mail como confirmado SEM prova de posse. Um parceiro poderia "reservar"
+   * o e-mail de um terceiro (que aí não conseguiria mais se cadastrar) e
+   * farmar contas órfãs — criar afiliado, criar login, apagar afiliado.
+   *
+   * A tela precisa dizer isso ANTES do clique. Oferecer os dois modos e deixar
+   * o 403 explicar depois é o que estava acontecendo: o parceiro preenchia
+   * e-mail e senha, clicava, e levava "Ação não permitida para o seu perfil"
+   * sem nenhuma pista do que fazer em vez disso.
+   */
+  const podeCriarLogin = me?.role === "admin";
+
   const [mode, setMode] = useState<"link" | "create">("link");
   const [email, setEmail] = useState(affiliate.email ?? "");
   const [password, setPassword] = useState("");
@@ -354,25 +371,37 @@ function AffiliateAccessDialog({ affiliate, onClose }: { affiliate: Affiliate; o
       }
     >
       <div className="space-y-4">
-        <div className="flex gap-2">
-          <Chip active={mode === "link"} onClick={() => setMode("link")}>
-            Vincular conta existente
-          </Chip>
-          <Chip active={mode === "create"} onClick={() => setMode("create")}>
-            Criar conta nova
-          </Chip>
-        </div>
+        {podeCriarLogin ? (
+          <Field label="Como">
+            <Segmented
+              value={mode}
+              onChange={(v) => setMode(v)}
+              options={[
+                { value: "link" as const, label: "Conta existente" },
+                { value: "create" as const, label: "Criar conta" },
+              ]}
+            />
+          </Field>
+        ) : null}
 
-        <p className="text-xs text-muted-foreground">
+        <Note tone={podeCriarLogin ? "neutral" : "warning"}>
           {mode === "link" ? (
             <>
-              Use quando o e-mail <strong>já tem login no TikTally</strong>. A mesma conta passa a ver
-              também o painel do afiliado — sem criar login novo e sem alterar a senha dela.
+              Use quando o e-mail <strong className="font-medium text-strong">já tem login no TikTally</strong>.
+              A mesma conta passa a ver também o painel do afiliado — sem criar login novo e sem
+              alterar a senha dela.
+              {!podeCriarLogin && (
+                <>
+                  {" "}
+                  Criar um login do zero é ação do administrador da TikTally: peça pro afiliado se
+                  cadastrar primeiro, e depois vincule aqui.
+                </>
+              )}
             </>
           ) : (
             <>Cria um login novo. Envie a senha por um canal seguro e peça pra trocar depois.</>
           )}
-        </p>
+        </Note>
 
         <Field label="E-mail de acesso">
           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="afiliado@email.com" />
@@ -389,11 +418,11 @@ function AffiliateAccessDialog({ affiliate, onClose }: { affiliate: Affiliate; o
           </Field>
         )}
 
-        <p className="text-xs text-muted-foreground">
-          Ele vê <strong>apenas o próprio desempenho</strong> (cupom, usos e comissões) e edita só a
-          própria chave PIX. Vincular também <strong>impede</strong> que ele use o próprio cupom.
+        <p className="t-caption leading-relaxed">
+          Ele vê <strong className="font-medium text-strong">apenas o próprio desempenho</strong>{" "}
+          (cupom, usos e comissões) e edita só a própria chave PIX. Vincular também{" "}
+          <strong className="font-medium text-strong">impede</strong> que ele use o próprio cupom.
         </p>
-
       </div>
     </Dialog>
   );
