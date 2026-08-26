@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, Link2, Check, Ticket } from "lucide-react";
+import { Copy, Check, Ticket } from "lucide-react";
 import { useMyPerformance, useMyPixMutation, useRedemptions } from "@/hooks/useBoCoupons";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ import type { MyCoupon, CouponRedemption } from "@/types";
 
 /**
  * Painel do AFILIADO (spec §8): desempenho do próprio cupom, bloco de
- * divulgação (código + link), histórico de usos (assinante mascarado) e a
+ * divulgação (o código), histórico de usos (assinante mascarado) e a
  * própria chave PIX. Somente leitura — escopo forçado no servidor.
  */
 export function AffiliatePanelPage() {
@@ -116,13 +116,13 @@ export function AffiliatePanelPage() {
  */
 function CouponShare({ coupon }: { coupon: MyCoupon }) {
   const toast = useToast();
-  const [copied, setCopied] = useState<"code" | "link" | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  const copy = (value: string, what: "code" | "link") => {
-    navigator.clipboard?.writeText(value);
-    setCopied(what);
-    toast.success(what === "code" ? "Código copiado" : "Link copiado", value);
-    setTimeout(() => setCopied(null), 1500);
+  const copiarCodigo = () => {
+    navigator.clipboard?.writeText(coupon.code);
+    setCopied(true);
+    toast.success("Código copiado", coupon.code);
+    setTimeout(() => setCopied(false), 1500);
   };
 
   return (
@@ -143,18 +143,20 @@ function CouponShare({ coupon }: { coupon: MyCoupon }) {
         </Status>
       </div>
 
+      {/* Só o código, e não o link.
+          O link de divulgação existia e levava o cliente ao checkout com o
+          desconto já aplicado — mas esse caminho não está em uso. Mantê-lo na
+          tela ensinaria o comercial a divulgar uma URL que ninguém sustenta, e
+          o primeiro cliente que reclamasse ("o desconto não veio") viraria um
+          chamado sem causa aparente. Quando o cupom por link voltar, o bloco
+          volta com ele. */}
       <div className="mt-5">
-        <p className="t-label mb-1.5">Link de divulgação</p>
-        <div className="flex gap-2">
-          <Input readOnly value={coupon.share_url} className="font-mono text-[0.75rem]" />
-          <Button variant="outline" onClick={() => copy(coupon.share_url, "link")}>
-            {copied === "link" ? <Check /> : <Link2 />} Link
-          </Button>
-          <Button variant="outline" onClick={() => copy(coupon.code, "code")}>
-            {copied === "code" ? <Check /> : <Copy />} Código
-          </Button>
-        </div>
-        <p className="t-caption mt-1.5">Quem abrir esse link já chega no checkout com o desconto aplicado.</p>
+        <Button variant="outline" onClick={copiarCodigo}>
+          {copied ? <Check /> : <Copy />} Copiar código
+        </Button>
+        <p className="t-caption mt-1.5">
+          Passe esse código para o cliente. Ele aplica no checkout, no campo de cupom.
+        </p>
       </div>
     </Surface>
   );
