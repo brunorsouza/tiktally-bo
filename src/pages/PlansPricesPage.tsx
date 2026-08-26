@@ -276,6 +276,26 @@ function PriceDialog({ price, planLabel, onClose }: { price: Price; planLabel: s
   const [total, setTotal] = useState(String(price.total_amount_cents / 100));
 
   const cycleLabel = CYCLE_LABELS[price.cycle] ?? price.cycle;
+
+  /**
+   * Digitar a parcela preenche o total, porque o número de parcelas já é
+   * conhecido — refazer `49,90 × 12` na cabeça é trabalho que a tela pode
+   * poupar, e é onde entra erro de digitação em campo de dinheiro.
+   *
+   * O total continua editável: nem sempre ele é o produto exato (arredondamento
+   * da operadora, total promocional). Quando os dois divergem, a tela DIZ isso
+   * em vez de corrigir sozinha — divergência aqui costuma ser intencional, e
+   * sobrescrever silenciosamente seria pior que apontar.
+   */
+  const calculado = (valorParcela: string): string => {
+    const n = Number(valorParcela);
+    if (!Number.isFinite(n) || n <= 0) return "";
+    return (Math.round(n * 100) * price.installments / 100).toFixed(2);
+  };
+
+  const totalEsperado = calculado(installment);
+  const diverge =
+    totalEsperado !== "" && total !== "" && Math.abs(Number(total) - Number(totalEsperado)) >= 0.01;
   const submit = () => {
     updatePrice.mutate(
       {
@@ -307,16 +327,28 @@ function PriceDialog({ price, planLabel, onClose }: { price: Price; planLabel: s
       }
     >
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Parcela (R$)">
+        <Field label="Parcela (R$)" hint={`× ${price.installments} parcelas`}>
           <Input
             type="number"
             min={0}
             step="0.01"
             value={installment}
-            onChange={(e) => setInstallment(e.target.value)}
+            onChange={(e) => {
+              const v = e.target.value;
+              setInstallment(v);
+              const t = calculado(v);
+              if (t !== "") setTotal(t);
+            }}
           />
         </Field>
-        <Field label="Total do ciclo (R$)">
+        <Field
+          label="Total do ciclo (R$)"
+          hint={
+            diverge
+              ? `${price.installments} × ${installment} daria ${totalEsperado} — o total foi ajustado à mão.`
+              : "Preenchido a partir da parcela. Dá pra sobrescrever."
+          }
+        >
           <Input type="number" min={0} step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} />
         </Field>
       </div>
