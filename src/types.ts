@@ -276,7 +276,7 @@ export interface MeInfo {
   coupon_discount_percent: number;
   /** Pool de gestão: comissão % = pool − desconto do cupom. */
   commission_pool_percent: number;
-  /** Descontos que o business pode escolher (ex.: [10, 15, 20]). */
+  /** Descontos que o business pode escolher (ex.: [5, 10, 15]). */
   coupon_percent_options: number[];
   /** Teto do cupom da própria conta do business (sem afiliado). */
   own_coupon_max_percent: number;

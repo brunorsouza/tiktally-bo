@@ -259,8 +259,8 @@ function CouponFormDialog({ coupon, onClose }: { coupon: Coupon | null; onClose:
   const { data: affData } = useAffiliates();
   const { data: me } = useMe();
   const isBusiness = me?.role === "business";
-  const pool = me?.commission_pool_percent ?? 30;
-  const percentOptions = me?.coupon_percent_options ?? [10, 15, 20];
+  const pool = me?.commission_pool_percent ?? 20;
+  const percentOptions = me?.coupon_percent_options ?? [5, 10, 15];
   const ownMax = me?.own_coupon_max_percent ?? 10;
   // Sem afiliado o cupom é "da própria conta" → teto menor.
   const maxPercent = affiliateId ? Math.max(...percentOptions) : ownMax;

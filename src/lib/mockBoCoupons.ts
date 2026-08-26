@@ -185,8 +185,8 @@ export const mockBoCoupons = {
       affiliate_id: papel === "affiliate" ? "a1" : null,
       scope_name: ehAdmin ? null : papel === "business" ? "Agência Alfa" : "João Silva",
       coupon_discount_percent: 20,
-      commission_pool_percent: 30,
-      coupon_percent_options: [10, 15, 20],
+      commission_pool_percent: 20,
+      coupon_percent_options: [5, 10, 15],
       own_coupon_max_percent: 10,
     });
   },

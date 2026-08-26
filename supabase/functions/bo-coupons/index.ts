@@ -241,19 +241,23 @@ async function couponDefaultPercent(db: SupabaseClient): Promise<number> {
 async function commissionPoolPercent(db: SupabaseClient): Promise<number> {
   const { data } = await db.from("settings").select("value").eq("key", "commission_pool_percent").maybeSingle();
   const n = typeof data?.value === "number" ? data.value : Number(data?.value);
-  return Number.isFinite(n) ? n : 30;
+  return Number.isFinite(n) ? n : 20;
 }
 
 /** Opções de desconto que o business pode escolher. */
-const BUSINESS_COUPON_PERCENTS = [10, 15, 20] as const;
-/** Sem afiliado (cupom da própria conta), o teto é 10%. */
-const BUSINESS_OWN_COUPON_MAX_PERCENT = 10;
+const BUSINESS_COUPON_PERCENTS = [5, 10, 15] as const;
+/** Sem afiliado (cupom da própria conta), o teto é o menor da faixa. */
+const BUSINESS_OWN_COUPON_MAX_PERCENT = 5;
 
 /**
  * Valida o desconto de um cupom criado/editado por um BUSINESS.
- * - cupom da própria conta (sem afiliado): até 10%
- * - cupom de afiliado da carteira: até 20%
- * Sempre um dos valores da tabela (10 / 15 / 20).
+ * - cupom da própria conta (sem afiliado): até 5%
+ * - cupom de afiliado da carteira: até 15%
+ * Sempre um dos valores da tabela (5 / 10 / 15).
+ *
+ * Escala trocada em 24/08/2026: a TikTally passou de 70% para 80% do valor de
+ * tabela, então o pool caiu de 30 para 20 e a faixa desceu junto. Um cupom de
+ * 20% agora consumiria o pool inteiro e zeraria a comissão.
  */
 function validateBusinessCouponPercent(pct: number, hasAffiliate: boolean): string | null {
   if (!BUSINESS_COUPON_PERCENTS.includes(pct as (typeof BUSINESS_COUPON_PERCENTS)[number])) {
