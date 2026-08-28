@@ -256,7 +256,20 @@ function AffiliateDialog({ affiliate, onClose }: { affiliate: Affiliate | null; 
           <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus={!isEdit} placeholder="Nome do afiliado" />
         </Field>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="E-mail">
+          {/*
+            "E-mail de contato", e não "E-mail": este campo é cadastro do
+            afiliado (`affiliates.email`) e NÃO a credencial de login
+            (`auth.users.email`) — `update_affiliate` nunca toca no Auth.
+
+            Rotulado só como "E-mail", ele parecia o login: já aconteceu de
+            alguém trocar aqui, tentar entrar com o endereço novo e não
+            conseguir, sem nada na tela explicando por quê. Quando existe login
+            vinculado, a dica avisa antes do erro.
+          */}
+          <Field
+            label="E-mail de contato"
+            hint={affiliate?.user_id ? "Não é o login — o acesso continua no e-mail atual." : undefined}
+          >
             <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="afiliado@email.com" />
           </Field>
           {!isBusiness && (
