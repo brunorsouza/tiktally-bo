@@ -18,6 +18,7 @@ import { PlansPricesPage } from "./pages/PlansPricesPage";
 import { AffiliatesPage } from "./pages/AffiliatesPage";
 import { BusinessesPage } from "./pages/BusinessesPage";
 import { CommissionsPage } from "./pages/CommissionsPage";
+import { LeadsPage } from "./pages/LeadsPage";
 import { BusinessPanelPage } from "./pages/BusinessPanelPage";
 import { AffiliatePanelPage } from "./pages/AffiliatePanelPage";
 import type { BoRole } from "./types";
@@ -74,6 +75,7 @@ export default function App() {
       />
       <Route path="/businesses" element={<Protected><BusinessesPage /></Protected>} />
       <Route path="/commissions" element={<Protected><CommissionsPage /></Protected>} />
+      <Route path="/leads" element={<Protected><LeadsPage /></Protected>} />
       <Route
         path="/business"
         element={

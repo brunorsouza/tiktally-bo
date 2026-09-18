@@ -15,6 +15,7 @@ import {
   Coins,
   Wallet,
   ShieldCheck,
+  UserPlus,
   Sun,
   Moon,
   PanelRight,
@@ -84,6 +85,13 @@ const adminSections: NavSection[] = [
       { to: "/businesses", label: "Businesses", icon: Building2 },
       { to: "/commissions", label: "Comissões", icon: Coins },
     ],
+  },
+  {
+    // Leads não é cupom nem afiliado: é o contato cru que o site captura,
+    // antes de existir cliente. Seção própria pra não ficar pendurado num
+    // menu que fala de outra etapa.
+    title: "Comercial",
+    items: [{ to: "/leads", label: "Leads", icon: UserPlus }],
   },
   {
     // Seção própria: quem entra no backoffice não é assunto de Fiscal, de

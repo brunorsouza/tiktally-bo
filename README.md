@@ -51,6 +51,30 @@ Telas:
 >
 > Não há programa de afiliados/comissões: o TikTally não tem esse conceito hoje.
 
+## Leads
+
+Os leads que o site captura no gate de preço (o visitante deixa nome, e-mail e
+WhatsApp pra ver os planos). Quem grava é a edge `capture-lead` do app
+principal, na tabela `pricing_leads`. O backoffice só lê e faz a triagem.
+
+- **Lista**: nome, e-mail, quando entrou, interesse, conta e situação, com
+  busca, filtro por período e abas por situação. Exporta CSV da página atual.
+- **Interesse**: "quente" é quem clicou num plano depois de liberar o preço
+  (`proceeded_at`), e a pastilha mostra qual plano e ciclo. Quem só viu o preço
+  aparece como tal.
+- **Conta**: cruzamento por e-mail com as contas do app. Mostra o nome da loja,
+  o plano e o status da assinatura de quem já se cadastrou.
+- **Triagem**: situação (novo, contatado, ganho, perdido) e uma anotação por
+  lead, gravadas em `pricing_leads.metadata.followup`. Sem migration: a coluna
+  `metadata` já existe.
+- **Excluir**: some com o registro. É pra spam e duplicado.
+
+Atalhos de contato na linha: WhatsApp (wa.me) e e-mail.
+
+> Backend: só o deploy da function `bo-leads` (mesma segurança do `bo-fiscal`).
+> **Nenhuma migration**. A tela de `/admin/leads` do app principal continua de
+> pé e lê a mesma tabela.
+
 ## Arquitetura
 
 ```
@@ -63,10 +87,10 @@ Edge Function  bo-fiscal   (no mesmo projeto Supabase)
    └─ chama a Spedy por seller (token da empresa + base prod/sandbox)
 ```
 
-O front usa **apenas a chave anon** — toda operação privilegiada passa pelas edge
-functions gateway (`bo-fiscal`, `bo-coupons`), o único lugar com service-role e que
-validam o admin server-side. Ambos só **leem e operam** dados que já existem no
-projeto — nenhuma migration nova.
+O front usa **apenas a chave anon**. Toda operação privilegiada passa pelas edge
+functions gateway (`bo-fiscal`, `bo-coupons`, `bo-leads`), o único lugar com
+service-role e que validam o admin server-side. Todos só **leem e operam** dados
+que já existem no projeto, sem migration nova.
 
 ## Setup
 
@@ -130,6 +154,17 @@ Para o módulo de cupons, só o deploy da `bo-coupons` (reaproveita `SUPABASE_UR
 ```bash
 npx supabase functions deploy bo-coupons --project-ref zgkxtyewmbkupuzeoyya
 ```
+
+Para o módulo de leads, só o deploy da `bo-leads` (também sem secrets novos e
+sem migration):
+
+```bash
+npx supabase functions deploy bo-leads --project-ref zgkxtyewmbkupuzeoyya
+```
+
+> Ordem importa: faça o deploy da function ANTES de subir o front. O menu
+> "Leads" aparece assim que o build vai pro ar, e sem a function ele abre em
+> erro.
 
 > `verify_jwt` deve ficar **ligado** (default). O JWT do admin é validado pela
 > plataforma e o `is_admin` é checado dentro da function.
