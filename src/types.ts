@@ -706,3 +706,83 @@ export interface GrantAdminResult {
   mode: "link" | "create";
   tambem_seller: boolean;
 }
+
+// ── Leads da landing ───────────────────────────────────────────────────────
+
+/**
+ * Lead capturado no gate de preço da landing (tabela `pricing_leads`, gravada
+ * pela edge `capture-lead` do app principal).
+ *
+ * `proceeded_at` preenchido = clicou num plano depois de liberar o preço. É o
+ * que separa curioso de interessado, e a tela chama isso de quente.
+ */
+export type LeadFollowupStatus = "new" | "contacted" | "won" | "lost";
+
+/** A conta do TikTally com o mesmo e-mail do lead, quando existe. */
+export interface LeadAccount {
+  user_id: string;
+  signed_up_at: string | null;
+  shop_name: string | null;
+  plan: string | null;
+  status: string | null;
+  current_period_end: string | null;
+}
+
+export interface Lead {
+  id: string;
+  name: string;
+  email: string;
+  whatsapp: string;
+  source: string;
+  proceeded_at: string | null;
+  proceeded_plan: string | null;
+  plan_cycle: string | null;
+  referrer: string | null;
+  created_at: string;
+  followup_status: LeadFollowupStatus;
+  followup_note: string | null;
+  followup_at: string | null;
+  /** null = nenhuma conta com esse e-mail (ver `accountsComplete`). */
+  account: LeadAccount | null;
+}
+
+export interface LeadFilters {
+  status?: LeadFollowupStatus | "";
+  temperature?: "cold" | "hot" | "";
+  search?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedLeads {
+  items: Lead[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  counts: Record<"all" | LeadFollowupStatus, number>;
+  /**
+   * false = a varredura de contas truncou. Nesse caso `account: null` não prova
+   * que o lead não tem conta, e a tela mostra "não verificado".
+   */
+  accountsComplete: boolean;
+}
+
+export interface LeadsOverview {
+  period: number;
+  total: number;
+  inPeriod: number;
+  hot: number;
+  cold: number;
+  /** null = não deu pra cruzar com as contas sem truncar. */
+  withAccount: number | null;
+  byStatus: Record<LeadFollowupStatus, number>;
+  daily: { date: string; leads: number; hot: number }[];
+}
+
+export interface LeadUpdateInput {
+  status?: LeadFollowupStatus;
+  note?: string;
+}
