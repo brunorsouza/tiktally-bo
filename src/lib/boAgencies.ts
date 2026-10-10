@@ -31,6 +31,19 @@ export interface BoAgencyCreated {
   email_sent: boolean;
 }
 
+export interface BoAgencySeller {
+  link_id: string;
+  email: string;
+  shop_name: string | null;
+  plan: string | null;
+  shop_connected: boolean;
+  status: "pending" | "active" | "revoked" | "declined" | "expired";
+  fiscal_setup: boolean;
+  accepted_at: string | null;
+  ended_at: string | null;
+  created_at: string;
+}
+
 export const boAgencies = {
   list: () => call<{ agencies: BoAgency[] }>("list_agencies", {}),
 
@@ -39,4 +52,11 @@ export const boAgencies = {
 
   setStatus: (agencyId: string, status: "active" | "suspended") =>
     call<{ id: string; status: string }>("set_status", { agency_id: agencyId, status }),
+
+  sellers: (agencyId: string) => call<{ sellers: BoAgencySeller[] }>("list_agency_sellers", { agency_id: agencyId }),
+
+  addSeller: (agencyId: string, email: string, notify: boolean) =>
+    call<{ link_id: string; email_sent: boolean }>("add_seller", { agency_id: agencyId, email, notify }),
+
+  removeSeller: (linkId: string) => call<{ link_id: string }>("remove_seller", { link_id: linkId }),
 };

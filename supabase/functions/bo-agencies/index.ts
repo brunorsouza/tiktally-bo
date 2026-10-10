@@ -302,6 +302,160 @@ async function actionSetStatus(db: SupabaseClient, body: Record<string, unknown>
   return ok(data);
 }
 
+
+// ── Sellers de uma agência ──────────────────────────────────────────────
+
+async function actionListSellers(db: SupabaseClient, body: Record<string, unknown>): Promise<Response> {
+  const agencyId = typeof body.agency_id === "string" ? body.agency_id : "";
+  if (!agencyId) return fail("agency_id é obrigatório.");
+  const { data: links, error } = await db
+    .from("agency_sellers")
+    .select("id, seller_user_id, invite_email, status, fiscal_setup, accepted_at, ended_at, created_at, invite_expires_at")
+    .eq("agency_id", agencyId)
+    .order("created_at", { ascending: false });
+  if (error) return fail(error.message, 500);
+
+  const ids = [...new Set((links ?? []).map((l) => l.seller_user_id).filter(Boolean))] as string[];
+  const [{ data: profiles }, { data: subs }, { data: toks }] = await Promise.all([
+    ids.length ? db.from("profiles").select("id, shop_name").in("id", ids) : Promise.resolve({ data: [] as { id: string; shop_name: string | null }[] }),
+    ids.length ? db.from("subscriptions").select("user_id, plan, status").in("user_id", ids) : Promise.resolve({ data: [] as { user_id: string; plan: string; status: string }[] }),
+    ids.length ? db.from("tiktok_tokens").select("user_id").in("user_id", ids) : Promise.resolve({ data: [] as { user_id: string }[] }),
+  ]);
+  const shop = new Map((profiles ?? []).map((p) => [p.id, p.shop_name]));
+  const plan = new Map((subs ?? []).map((x) => [x.user_id, `${x.plan}${x.status ? ` (${x.status})` : ""}`]));
+  const conectada = new Set((toks ?? []).map((t) => t.user_id));
+  const agora = Date.now();
+
+  return ok({
+    sellers: (links ?? []).map((l) => ({
+      link_id: l.id,
+      email: l.invite_email,
+      shop_name: l.seller_user_id ? shop.get(l.seller_user_id) ?? null : null,
+      plan: l.seller_user_id ? plan.get(l.seller_user_id) ?? null : null,
+      shop_connected: l.seller_user_id ? conectada.has(l.seller_user_id) : false,
+      status:
+        l.status === "pending" && l.invite_expires_at && Date.parse(l.invite_expires_at) < agora ? "expired" : l.status,
+      fiscal_setup: l.fiscal_setup,
+      accepted_at: l.accepted_at,
+      ended_at: l.ended_at,
+      created_at: l.created_at,
+    })),
+  });
+}
+
+/**
+ * Vínculo feito pelo admin, sem o seller passar pelo convite. Para teste e para
+ * suporte. Por não ter o aceite do seller, a permissão fiscal nasce DESLIGADA
+ * (configurar NF-e no CNPJ dele exige o consentimento dele) e a ação fica na
+ * trilha como `link.admin_add`. Avisar o seller por e-mail é opcional.
+ */
+async function actionAddSeller(db: SupabaseClient, body: Record<string, unknown>, actorId: string): Promise<Response> {
+  const agencyId = typeof body.agency_id === "string" ? body.agency_id : "";
+  if (!agencyId) return fail("agency_id é obrigatório.");
+  if (!isEmail(body.email)) return fail("E-mail inválido.");
+  const email = body.email.trim().toLowerCase();
+  const notify = body.notify === true;
+
+  const { data: agency } = await db.from("agencies").select("id, name, status").eq("id", agencyId).maybeSingle();
+  if (!agency) return fail("Agência não encontrada.", 404);
+
+  const { data: sellerId, error: lookErr } = await db.rpc("bo_user_id_by_email", { p_email: email });
+  if (lookErr) return fail(lookErr.message, 500);
+  if (!sellerId) return fail("Não existe conta com esse e-mail. O seller precisa ter conta no TikTally.", 404);
+
+  // Contas separadas: conta de agência não é seller de ninguém.
+  const { data: member } = await db.from("agency_members").select("agency_id").eq("user_id", sellerId).limit(1);
+  const { data: u } = await db.auth.admin.getUserById(sellerId as string);
+  if ((member ?? []).length > 0 || u?.user?.app_metadata?.account_type === "agency") {
+    return fail("Esse e-mail é de uma conta de agência, não de um seller.", 400);
+  }
+  // Login compartilhado não é o dono da loja.
+  const { data: shared } = await db.from("account_shares").select("owner_user_id").eq("shared_user_id", sellerId).maybeSingle();
+  if (shared) return fail("Esse e-mail é um acesso compartilhado. Use o e-mail do dono da loja.", 400);
+
+  const { data: active } = await db
+    .from("agency_sellers")
+    .select("id")
+    .eq("agency_id", agencyId)
+    .eq("seller_user_id", sellerId)
+    .eq("status", "active")
+    .maybeSingle();
+  if (active) return fail("Esse seller já está na carteira desta agência.", 409);
+
+  const agora = new Date().toISOString();
+  const linha = {
+    seller_user_id: sellerId,
+    status: "active",
+    fiscal_setup: false,
+    accepted_at: agora,
+    invite_token_hash: null,
+    invite_expires_at: null,
+    invited_by: actorId,
+  };
+
+  // Convite pendente para o mesmo e-mail vira o vínculo (o índice de unicidade
+  // não deixa existir um pendente e um ativo para o mesmo seller).
+  // Duas consultas em vez de um `.or()` montado com o e-mail digitado.
+  const [porId, porEmail] = await Promise.all([
+    db.from("agency_sellers").select("id").eq("agency_id", agencyId).eq("seller_user_id", sellerId).eq("status", "pending").limit(1),
+    db.from("agency_sellers").select("id").eq("agency_id", agencyId).eq("invite_email", email).eq("status", "pending").limit(1),
+  ]);
+  const pending = [...(porId.data ?? []), ...(porEmail.data ?? [])];
+
+  let linkId: string;
+  if (pending && pending.length > 0) {
+    const { error } = await db.from("agency_sellers").update(linha).eq("id", pending[0].id);
+    if (error) return fail(error.message, 500);
+    linkId = pending[0].id;
+  } else {
+    const { data, error } = await db
+      .from("agency_sellers")
+      .insert({ ...linha, agency_id: agencyId, invite_email: email })
+      .select("id")
+      .single();
+    if (error) return fail(error.message, 500);
+    linkId = data.id;
+  }
+
+  await audit(db, {
+    agency_id: agencyId,
+    actor_user_id: actorId,
+    action: "link.admin_add",
+    meta: { link_id: linkId, seller_user_id: sellerId, email, notified: notify },
+  });
+
+  let emailSent = false;
+  if (notify) {
+    emailSent = await sendEmail(email, `A ${agency.name} passou a acompanhar a sua loja no TikTally`, [
+      `A agência ${agency.name} passou a acompanhar a sua loja no TikTally.`,
+      "Ela vê as suas telas sem poder alterar nada.",
+      "Se você não reconhece essa agência, remova o acesso em Configurações, na seção Agência.",
+    ], { label: "Abrir Configurações", url: `${appUrl()}/panel/configuracoes` });
+  }
+
+  return ok({ link_id: linkId, email_sent: emailSent });
+}
+
+async function actionRemoveSeller(db: SupabaseClient, body: Record<string, unknown>, actorId: string): Promise<Response> {
+  const linkId = typeof body.link_id === "string" ? body.link_id : "";
+  if (!linkId) return fail("link_id é obrigatório.");
+  const { data: link } = await db.from("agency_sellers").select("id, agency_id, seller_user_id, status").eq("id", linkId).maybeSingle();
+  if (!link || (link.status !== "active" && link.status !== "pending")) return fail("Vínculo não encontrado.", 404);
+  const { error } = await db
+    .from("agency_sellers")
+    .update({ status: "revoked", ended_at: new Date().toISOString(), ended_by: actorId, invite_token_hash: null })
+    .eq("id", linkId)
+    .in("status", ["active", "pending"]);
+  if (error) return fail(error.message, 500);
+  await audit(db, {
+    agency_id: link.agency_id,
+    actor_user_id: actorId,
+    action: "link.admin_revoke",
+    meta: { link_id: linkId, seller_user_id: link.seller_user_id, was: link.status },
+  });
+  return ok({ link_id: linkId, status: "revoked" });
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -333,6 +487,12 @@ Deno.serve(async (req) => {
         return await actionCreate(db, body, actorId);
       case "set_status":
         return await actionSetStatus(db, body, actorId);
+      case "list_agency_sellers":
+        return await actionListSellers(db, body);
+      case "add_seller":
+        return await actionAddSeller(db, body, actorId);
+      case "remove_seller":
+        return await actionRemoveSeller(db, body, actorId);
       default:
         return fail(`Ação desconhecida: ${action || "(vazia)"}`, 400);
     }

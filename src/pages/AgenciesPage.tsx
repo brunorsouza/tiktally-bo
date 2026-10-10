@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { Building2, Copy } from "lucide-react";
 
-import { useAgencies, useAgencyMutations } from "@/hooks/useBoAgencies";
+import { useAgencies, useAgencyMutations, useAgencySellers } from "@/hooks/useBoAgencies";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { CellStack, DataTable, type Column } from "@/components/ds/DataTable";
-import { Field, Fieldset, Note, PageHeader, Status } from "@/components/ds";
+import { Checkbox, Field, Fieldset, Note, PageHeader, Panel, Status } from "@/components/ds";
 import { formatDate } from "@/lib/formatters";
-import type { BoAgency, BoAgencyCreated } from "@/lib/boAgencies";
+import type { BoAgency, BoAgencyCreated, BoAgencySeller } from "@/lib/boAgencies";
 
 /**
  * Agências do app.
@@ -30,6 +30,8 @@ export function AgenciesPage() {
   const [form, setForm] = useState({ name: "", cnpj: "", owner_email: "" });
   const [created, setCreated] = useState<BoAgencyCreated | null>(null);
   const [suspending, setSuspending] = useState<BoAgency | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = data?.agencies.find((a) => a.id === selectedId) ?? null;
 
   const canSubmit = form.name.trim().length >= 2 && form.owner_email.trim().length > 3;
 
@@ -163,10 +165,16 @@ export function AgenciesPage() {
         columns={columns}
         rows={data?.agencies}
         rowKey={(a) => a.id}
+        onRowClick={(a) => setSelectedId((cur) => (cur === a.id ? null : a.id))}
         loading={isLoading}
         error={error ? (error as Error).message : null}
         empty={{ title: "Nenhuma agência ainda", description: "Crie a primeira acima." }}
       />
+
+      {data && data.agencies.length > 0 && !selected && (
+        <Note tone="neutral">Clique numa agência para ver e gerenciar os sellers dela.</Note>
+      )}
+      {selected && <AgencySellersPanel agency={selected} onClose={() => setSelectedId(null)} />}
 
       {suspending && (
         <ConfirmDialog
@@ -186,5 +194,122 @@ export function AgenciesPage() {
         />
       )}
     </div>
+  );
+}
+
+const SELLER_STATUS: Record<BoAgencySeller["status"], { label: string; tone: "success" | "warning" | "neutral" }> = {
+  active: { label: "Ativo", tone: "success" },
+  pending: { label: "Convite enviado", tone: "warning" },
+  expired: { label: "Convite expirado", tone: "neutral" },
+  revoked: { label: "Removido", tone: "neutral" },
+  declined: { label: "Recusado", tone: "neutral" },
+};
+
+/**
+ * Sellers de uma agência. O admin vê todos os vínculos (inclusive encerrados,
+ * que ficam como histórico), vincula por e-mail sem passar pelo convite e
+ * remove.
+ *
+ * Vínculo pelo admin não tem o aceite do seller: a permissão de configurar a
+ * NF-e nasce desligada e o seller só pode ligá-la nas Configurações dele.
+ */
+function AgencySellersPanel({ agency, onClose }: { agency: BoAgency; onClose: () => void }) {
+  const { data, isLoading, error } = useAgencySellers(agency.id);
+  const { addSeller, removeSeller } = useAgencyMutations();
+  const [email, setEmail] = useState("");
+  const [notify, setNotify] = useState(true);
+  const [removing, setRemoving] = useState<BoAgencySeller | null>(null);
+
+  const columns: Column<BoAgencySeller>[] = [
+    { header: "Seller", cell: (r) => <CellStack title={r.shop_name ?? r.email} subtitle={r.shop_name ? r.email : undefined} /> },
+    { header: "Plano", cell: (r) => r.plan ?? "—", hideBelow: "md" },
+    {
+      header: "Loja",
+      cell: (r) => (r.status === "active" ? (r.shop_connected ? "Conectada" : "Não conectada") : "—"),
+      hideBelow: "md",
+    },
+    { header: "NF-e", cell: (r) => (r.status === "active" ? (r.fiscal_setup ? "Pode configurar" : "Não") : "—"), hideBelow: "lg" },
+    {
+      header: "Desde",
+      cell: (r) => formatDate(r.accepted_at ?? r.created_at),
+      width: "8rem",
+      hideBelow: "lg",
+    },
+    {
+      header: "Status",
+      cell: (r) => <Status tone={SELLER_STATUS[r.status].tone}>{SELLER_STATUS[r.status].label}</Status>,
+      width: "9rem",
+    },
+    {
+      header: "",
+      cell: (r) =>
+        r.status === "active" || r.status === "pending" ? (
+          <Button variant="ghost" size="sm" onClick={() => setRemoving(r)}>
+            Remover
+          </Button>
+        ) : null,
+      align: "right",
+      width: "7rem",
+    },
+  ];
+
+  return (
+    <Panel
+      title={`Sellers da ${agency.name}`}
+      actions={
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          Fechar
+        </Button>
+      }
+    >
+      <form
+        className="mb-5 flex flex-wrap items-end gap-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const v = email.trim();
+          if (!v) return;
+          addSeller.mutate({ agencyId: agency.id, email: v, notify }, { onSuccess: () => setEmail("") });
+        }}
+      >
+        <Field label="Vincular seller por e-mail" hint="O seller precisa ter conta no TikTally." className="w-80">
+          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e-mail do dono da loja" />
+        </Field>
+        <Checkbox
+          checked={notify}
+          onChange={setNotify}
+          label="Avisar o seller por e-mail"
+          hint="Recomendado: ele não passou pelo convite."
+        />
+        <Button type="submit" disabled={!email.trim() || addSeller.isPending} loading={addSeller.isPending}>
+          Vincular
+        </Button>
+      </form>
+
+      <DataTable
+        bare
+        columns={columns}
+        rows={data?.sellers}
+        rowKey={(r) => r.link_id}
+        loading={isLoading}
+        error={error ? (error as Error).message : null}
+        empty={{ title: "Nenhum seller nesta agência", description: "Vincule por e-mail acima, ou a agência convida pelo app." }}
+      />
+
+      {removing && (
+        <ConfirmDialog
+          title="Remover seller da agência"
+          confirmLabel="Remover"
+          loading={removeSeller.isPending}
+          onClose={() => setRemoving(null)}
+          onConfirm={() => removeSeller.mutate(removing.link_id, { onSuccess: () => setRemoving(null) })}
+          description={
+            <>
+              <strong className="text-strong">{removing.shop_name ?? removing.email}</strong> sai da carteira da{" "}
+              {agency.name} na hora. O vínculo fica no histórico.
+            </>
+          }
+        />
+      )}
+    </Panel>
   );
 }
