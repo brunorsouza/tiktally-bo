@@ -19,6 +19,7 @@ import { AffiliatesPage } from "./pages/AffiliatesPage";
 import { BusinessesPage } from "./pages/BusinessesPage";
 import { CommissionsPage } from "./pages/CommissionsPage";
 import { LeadsPage } from "./pages/LeadsPage";
+import { AgenciesPage } from "./pages/AgenciesPage";
 import { BusinessPanelPage } from "./pages/BusinessPanelPage";
 import { AffiliatePanelPage } from "./pages/AffiliatePanelPage";
 import type { BoRole } from "./types";
@@ -53,6 +54,7 @@ export default function App() {
       <Route path="/companies" element={<Protected><CompaniesPage /></Protected>} />
       <Route path="/accounts" element={<Protected><AccountsPage /></Protected>} />
       <Route path="/admins" element={<Protected><AdminsPage /></Protected>} />
+      <Route path="/agencies" element={<Protected><AgenciesPage /></Protected>} />
       <Route path="/coupons-overview" element={<Protected><CouponsOverviewPage /></Protected>} />
       <Route
         path="/coupons"
