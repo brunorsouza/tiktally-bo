@@ -7,6 +7,7 @@ import {
   Webhook,
   LogOut,
   BarChart3,
+  Briefcase,
   Ticket,
   Gift,
   DollarSign,
@@ -98,7 +99,10 @@ const adminSections: NavSection[] = [
     // Cupons nem de Afiliados — e enfiar em qualquer uma delas esconderia a
     // tela mais sensível do console dentro de um menu que fala de outra coisa.
     title: "Sistema",
-    items: [{ to: "/admins", label: "Administradores", icon: ShieldCheck }],
+    items: [
+      { to: "/admins", label: "Administradores", icon: ShieldCheck },
+      { to: "/agencies", label: "Agências", icon: Briefcase },
+    ],
   },
 ];
 
